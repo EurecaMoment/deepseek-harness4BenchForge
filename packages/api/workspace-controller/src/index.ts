@@ -1,6 +1,7 @@
 /** Host Workspace Remote owner: explicit commands and reconnect-safe state. */
 
-import { Context } from '@deepseek-ai/cordis'
+import { Context, Service } from '@deepseek-ai/cordis'
+import { mkdir } from 'node:fs/promises'
 import z from '@deepseek-ai/schemastery'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import type {} from '@deepseek-ai/dsh-api-remote-access'
@@ -35,6 +36,8 @@ export { DirectoryPickerController } from './directory-picker.ts'
 
 /** First-use directory policy for the Host account. */
 export interface Config {
+  /** Fully qualified directory registered as the deployment's default workspace. */
+  defaultWorkspace?: string
   /** Override the system Documents directory with a fully qualified path. */
   documentsDirectory?: string
   /** Maximum duration of the operating system's Documents lookup. */
@@ -56,6 +59,7 @@ export class WorkspaceController extends TypertRemoteService {
   static inject = ['remoteAccess', 'typert', 'workspaceRegistry']
 
   static Config: z<Config, ResolvedConfig> = z.object({
+    defaultWorkspace: z.string().min(1),
     documentsDirectory: z.string(),
     documentsLookupTimeoutMs: z.natural().min(1).default(10_000),
   })
@@ -63,6 +67,7 @@ export class WorkspaceController extends TypertRemoteService {
   private readonly config: ResolvedConfig
   private readonly commands: WorkspaceCommands
   private readonly feed: WorkspaceFeed
+  private defaultWorkspaceId?: WorkspaceId
 
   /**
    * @param ctx - Host context containing the Workspace registry.
@@ -80,6 +85,14 @@ export class WorkspaceController extends TypertRemoteService {
     // stays pending until a picking backend is composed, so a host without one
     // registers no picking namespace instead of answering an unservable verb.
     ctx.plugin(DirectoryPickerController)
+  }
+
+  protected async [Service.init](): Promise<void> {
+    const directory = this.config.defaultWorkspace
+    if (directory === undefined) return
+    const absolute = validateDocumentsDirectory(directory, process.platform, 'Default workspace')
+    await mkdir(absolute, { recursive: true })
+    this.defaultWorkspaceId = (await this.ctx.workspaceRegistry.create(absolute)).id
   }
 
   /**
@@ -213,12 +226,14 @@ export class WorkspaceController extends TypertRemoteService {
     /** The admitted part of `value`; it becomes the delivered set. */
     const filtered = (value: WorkspaceBaseline): WorkspaceBaseline => {
       const items = value.items.filter(item => visible(item.workspaceId))
+      const defaultWorkspaceId = this.defaultWorkspaceId
       delivered.clear()
       for (const item of items) delivered.add(item.workspaceId)
       return {
         items: items.map(item => ({ ...item, sessionIds: sessions(item.sessionIds) })),
         archivedSessionIds: sessions(value.archivedSessionIds),
         pinnedSessionIds: sessions(value.pinnedSessionIds),
+        ...defaultWorkspaceId !== undefined && delivered.has(defaultWorkspaceId) ? { defaultWorkspaceId } : {},
       }
     }
     for await (const frame of this.feed.follow(signal)) {

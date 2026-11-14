@@ -31,6 +31,7 @@ export type WorkspaceListPhase = 'pending' | 'ready'
 /** Immutable Client Workspace state. */
 export interface WorkspaceSnapshot {
   readonly items: readonly WorkspaceView[]
+  readonly defaultWorkspaceId?: WorkspaceId
   /** Complete registry-global archive set in Host order. */
   readonly archivedSessionIds: WorkspaceArchiveValue['archivedSessionIds']
   /** Complete registry-global pin set, most recently pinned first. */
@@ -61,6 +62,7 @@ export interface WorkspaceFollowSink {
  */
 export class ClientWorkspaceModel implements WorkspaceFollowSink {
   private items: readonly WorkspaceView[] = []
+  private defaultWorkspaceId: WorkspaceId | undefined
   private archivedSessionIds: WorkspaceArchiveValue['archivedSessionIds'] = []
   private pinnedSessionIds: WorkspacePinValue['pinnedSessionIds'] = []
   private state: WorkspaceSnapshot['state'] = 'loading'
@@ -266,6 +268,7 @@ export class ClientWorkspaceModel implements WorkspaceFollowSink {
     this.archiveRequestSeq++
     this.pinRequestSeq++
     this.installViews(baseline.items)
+    this.defaultWorkspaceId = baseline.defaultWorkspaceId
     this.installArchived(baseline.archivedSessionIds)
     this.installPinned(baseline.pinnedSessionIds)
     this.state = 'idle'
@@ -348,6 +351,7 @@ export class ClientWorkspaceModel implements WorkspaceFollowSink {
   private buildSnapshot(): WorkspaceSnapshot {
     return {
       items: this.items,
+      ...this.defaultWorkspaceId === undefined ? {} : { defaultWorkspaceId: this.defaultWorkspaceId },
       archivedSessionIds: this.archivedSessionIds,
       pinnedSessionIds: this.pinnedSessionIds,
       state: this.state,

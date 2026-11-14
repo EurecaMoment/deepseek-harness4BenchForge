@@ -18,11 +18,11 @@ interface DocumentsDirectoryInternals {
  * @param platform - Host platform.
  * @returns the normalized directory.
  */
-export function validateDocumentsDirectory(directory: string, platform: NodeJS.Platform = process.platform): string {
+export function validateDocumentsDirectory(directory: string, platform: NodeJS.Platform = process.platform, label = 'Documents directory'): string {
   const paths = platform === 'win32' ? win32 : posix
   const root = paths.parse(directory).root
   if (!paths.isAbsolute(directory) || (platform === 'win32' && (root === '\\' || root === '/'))) {
-    throw new Error(`Documents directory must be fully qualified: '${directory}'`)
+    throw new Error(`${label} must be fully qualified: '${directory}'`)
   }
   return paths.normalize(directory)
 }

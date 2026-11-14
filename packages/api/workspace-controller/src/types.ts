@@ -152,6 +152,8 @@ export interface WorkspacePinValue {
 /** Complete reconnect baseline for Workspace browser state. */
 export interface WorkspaceBaseline {
   readonly items: readonly WorkspaceView[]
+  /** Configured preferred workspace, when visible to the caller. */
+  readonly defaultWorkspaceId?: WorkspaceId
   readonly archivedSessionIds: readonly SessionId[]
   /** Registry-global pin set, most recently pinned first. */
   readonly pinnedSessionIds: readonly SessionId[]
