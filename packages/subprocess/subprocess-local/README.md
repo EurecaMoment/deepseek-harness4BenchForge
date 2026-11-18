@@ -93,6 +93,7 @@ Each spawn selects one owner for both signalling and quiescence. Supported Linux
 | [`src/spawn.ts`](src/spawn.ts) | Shared process plumbing: direct outcomes, tail-keep collection, spill files, and fallback spawning |
 | [`src/managed-owner.ts`](src/managed-owner.ts) | Private signal-and-wait owner used by each ordinary handle |
 | [`src/linux-scope.ts`](src/linux-scope.ts) | Linux user-systemd capability checks, scope launch, signalling, and quiescence |
+| [`src/linux-cgroup.ts`](src/linux-cgroup.ts) | Recursive kernel population evidence when systemd task accounting is unavailable |
 | [`src/linux-execve.ts`](src/linux-execve.ts) | Linux libc image replacement and inherited-standard-descriptor preservation |
 | [`src/windows-job.ts`](src/windows-job.ts) | Windows Job capability checks and helper launch |
 | [`src/runner-launch.ts`](src/runner-launch.ts) | Source, built, and packaged private-runner selection |
@@ -128,6 +129,8 @@ Read these pages when the provider-level contract is not enough. They move from 
 -----
 
 Terminal allocation advertises the caller-provided `terminalType` through TERM and node-pty. Dynamic resize updates the existing PTY. Output backpressure pauses native reads until the consumer drains; explicit termination resumes a paused reader to receive the exit notification.
+
+When a terminated Linux scope stays active with `TasksCurrent=[not set]`, the provider checks its `ControlGroup` against the readable cgroup-v2 mounts in `/proc/self/mountinfo`. Only an explicit recursive `populated 0` establishes an empty range. A live launcher whose request remains unconsumed still prevents release; missing files, cgroup-v1-only hosts, and unreadable or malformed evidence remain unknown. This handles stale manager state after a missed cgroup notification without treating a direct command's exit as proof that all descendants stopped.
 
 <a id="model-experience"></a>
 ## Model Experience

@@ -136,7 +136,7 @@ function launch(
     options = received
     return child
   })
-  const spawnSync = vi.fn(() => ({ status: 0, stdout: '', stderr: '' }))
+  const spawnSync = recordingSystemctl()
   const systemctlQuery = overrides.systemctlQuery ?? query
   const result = launchLinuxScope(request, { TARGET: 'yes' }, ['--expand-environment=no'], {
     spawn: overrides.spawn ?? spawn as never,
@@ -148,6 +148,7 @@ function launch(
     ...overrides.runnerAvailable === undefined ? {} : { runnerAvailable: overrides.runnerAvailable },
     ...overrides.loadLinuxExecve === undefined ? {} : { loadLinuxExecve: overrides.loadLinuxExecve },
     ...overrides.sleep === undefined ? {} : { sleep: overrides.sleep },
+    ...overrides.cgroupPopulated === undefined ? {} : { cgroupPopulated: overrides.cgroupPopulated },
   })
   const requestPath = options?.env?.[SUBPROCESS_RUNNER_ENV]
   if (requestPath === undefined) throw new Error('launch did not publish a request locator')
@@ -930,6 +931,36 @@ describe('Linux scope establishment and quiescence', () => {
       ['--user', 'kill', '--kill-who=all', '--signal=SIGKILL', expect.stringMatching(/\.scope$/u)],
       ['--user', 'stop', expect.stringMatching(/\.scope$/u)],
     ])
+    launched.result.owner.cleanup?.()
+  })
+
+  it('releases an empty kernel cgroup when systemd remains active without task accounting', async () => {
+    const controlGroup = '/user.slice/user-42.slice/user@42.service/dsh.scope'
+    const cgroupPopulated = vi.fn(() => false)
+    const launched = launch(async () => ({ ...activeUnitWithTasks('[not set]'),
+      stdout: activeUnitWithTasks('[not set]').stdout + `ControlGroup=${controlGroup}\n`,
+    }), { cgroupPopulated })
+    launched.result.owner.signal('SIGKILL')
+    launched.child.exit(null, 'SIGKILL')
+    await expect(launched.result.owner.waitForExit()).resolves.toBeUndefined()
+    expect(cgroupPopulated).toHaveBeenCalledWith(controlGroup)
+    expect(launched.spawnSync.mock.calls.map(call => call[1]?.[1])).toEqual(['kill', 'stop'])
+    launched.result.owner.cleanup?.()
+  })
+
+  it.each([true, undefined])('retains a scope whose recursive population is %s', async (population) => {
+    const state = { ...activeUnitWithTasks('[not set]'),
+      stdout: activeUnitWithTasks('[not set]').stdout + 'ControlGroup=/user.slice/dsh.scope\n',
+    }
+    const states = [state, unloadedUnit()]
+    const cgroupPopulated = vi.fn(() => population)
+    const launched = launch(async () => states.shift() ?? unloadedUnit(), { cgroupPopulated })
+    consumeLinuxLaunchRequest(launched.requestPath)
+    launched.result.owner.signal('SIGKILL')
+    launched.child.exit(null, 'SIGKILL')
+    await expect(launched.result.owner.waitForExit()).resolves.toBeUndefined()
+    expect(cgroupPopulated).toHaveBeenCalledOnce()
+    expect(launched.spawnSync.mock.calls.map(call => call[1]?.[1])).toEqual(['kill'])
     launched.result.owner.cleanup?.()
   })
 

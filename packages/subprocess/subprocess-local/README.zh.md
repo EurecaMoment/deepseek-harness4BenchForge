@@ -93,6 +93,7 @@ Linux 普通进程和终端进程即使在 bootstrap 消费启动请求前被取
 | [`src/spawn.ts`](src/spawn.ts) | 共享进程管道：直接结果、保尾收集、spill 文件与 fallback spawn |
 | [`src/managed-owner.ts`](src/managed-owner.ts) | 每个普通句柄使用的私有信号与等待 owner |
 | [`src/linux-scope.ts`](src/linux-scope.ts) | Linux user-systemd 能力检查、scope 启动、信号发送与完全停稳 |
+| [`src/linux-cgroup.ts`](src/linux-cgroup.ts) | systemd 任务计数不可用时读取内核中的递归进程占用状态 |
 | [`src/linux-execve.ts`](src/linux-execve.ts) | Linux libc 进程映像替换与继承标准文件描述符保留 |
 | [`src/windows-job.ts`](src/windows-job.ts) | Windows Job 能力检查与 helper 启动 |
 | [`src/runner-launch.ts`](src/runner-launch.ts) | source、built 与 packaged 私有 runner 选择 |
@@ -128,6 +129,8 @@ spill 文件以 `0600` 权限、`O_EXCL` 与随机名称在 `0700` 每进程目�
 -----
 
 终端分配通过 TERM 和 node-pty 使用调用者指定的 `terminalType`。动态 resize 更新已有 PTY。输出背压会暂停原生读取，待消费者排空后恢复；显式终止会恢复暂停的读取，以接收退出通知。
+
+已请求终止的 Linux scope 仍为 active 且 `TasksCurrent=[not set]` 时，提供方根据 `/proc/self/mountinfo` 中可读的 cgroup-v2 挂载检查其 `ControlGroup`。只有明确的递归 `populated 0` 才能证明整个范围为空。仍在运行且尚未消费请求的 launcher 仍会阻止释放；文件缺失、仅有 cgroup-v1，以及不可读或格式异常的证据都保持未知。这样可以处理 manager 丢失 cgroup 通知后的过时状态，而不会把直接命令退出当成全部后代已经停止的证据。
 
 <a id="model-experience"></a>
 ## 模型体验

@@ -28,6 +28,7 @@ import {
 } from './runner-launch.ts'
 import type { RunnerInvocation } from './runner-launch.ts'
 import { childEnv } from './spawn.ts'
+import { linuxCgroupPopulated } from './linux-cgroup.ts'
 
 /** Test seams for systemd command execution. */
 export interface LinuxScopeInternals {
@@ -43,6 +44,8 @@ export interface LinuxScopeInternals {
   sleep?: (delayMs: number, signal?: AbortSignal) => Promise<void>
   /** Kernel unix socket table read by the user-manager confirmation; defaults to /proc/net/unix. */
   unixSocketTable?: string
+  /** Read recursive kernel population when systemd task accounting is unavailable. */
+  cgroupPopulated?: (controlGroup: string) => boolean | undefined
 }
 
 interface SystemctlResult {
@@ -299,6 +302,7 @@ class SystemdScopeOwner implements BoundProcessOwner {
     private readonly runSync: typeof spawnSync,
     private readonly query: (command: string, args: readonly string[]) => Promise<SystemctlResult>,
     private readonly sleep: (delayMs: number, signal?: AbortSignal) => Promise<void>,
+    private readonly cgroupPopulated: (controlGroup: string) => boolean | undefined,
   ) {}
 
   inspectTaskCount(): number | undefined {
@@ -390,9 +394,10 @@ class SystemdScopeOwner implements BoundProcessOwner {
    * payload; a consumed request proves the payload already entered the scope,
    * even while its direct-process exit notification is pending.
    */
-  private emptyRange(tasksCurrent: number | undefined): boolean {
-    return this.terminationRequested && tasksCurrent === 0
-      && (!this.direct.running() || !existsSync(this.startup.files.requestPath))
+  private emptyRange(tasksCurrent: number | undefined, controlGroup?: string): boolean {
+    if (!this.terminationRequested || (this.direct.running() && existsSync(this.startup.files.requestPath))) return false
+    return tasksCurrent === 0 || (tasksCurrent === undefined && controlGroup !== undefined
+      && this.cgroupPopulated(controlGroup) === false)
   }
 
   /** Release a leftover empty scope so the transient unit is collected and cannot accumulate. */
@@ -408,7 +413,12 @@ class SystemdScopeOwner implements BoundProcessOwner {
     }
   }
 
-  private parseUnitState(stdout: string): { loadState: string; activeState: string; tasksCurrent: number | undefined } {
+  private parseUnitState(stdout: string): {
+    loadState: string
+    activeState: string
+    tasksCurrent: number | undefined
+    controlGroup?: string
+  } {
     const values = new Map<string, string>()
     for (const line of stdout.split(/\r?\n/u)) {
       if (line === '') continue
@@ -426,8 +436,9 @@ class SystemdScopeOwner implements BoundProcessOwner {
     const activeState = values.get('ActiveState')
     // The manager prints this sentinel for a property the unit does not carry.
     const reportedTasks = values.get('TasksCurrent')
+    const controlGroup = values.get('ControlGroup')
     const tasksCurrent = reportedTasks === '[not set]' ? undefined : reportedTasks
-    if (values.size !== (reportedTasks === undefined ? 2 : 3)
+    if (values.size !== 2 + Number(reportedTasks !== undefined) + Number(controlGroup !== undefined)
       || loadState === undefined || activeState === undefined) {
       throw new Error(`systemctl returned incomplete state for ${this.unit}: ${JSON.stringify(stdout.trim())}`)
     }
@@ -438,6 +449,7 @@ class SystemdScopeOwner implements BoundProcessOwner {
       loadState,
       activeState,
       tasksCurrent: tasksCurrent === undefined ? undefined : Number(tasksCurrent),
+      ...controlGroup ? { controlGroup } : {},
     }
   }
 
@@ -452,12 +464,13 @@ class SystemdScopeOwner implements BoundProcessOwner {
       '--property=LoadState',
       '--property=ActiveState',
       '--property=TasksCurrent',
+      '--property=ControlGroup',
     ])
     // A signal invalidates state queried before its delivery and direct fallback.
     if (generation !== this.wakeGeneration) return true
     const output = `${result.stdout}\n${result.stderr}`
     if (result.status === 0) {
-      const { loadState, activeState, tasksCurrent } = this.parseUnitState(result.stdout)
+      const { loadState, activeState, tasksCurrent, controlGroup } = this.parseUnitState(result.stdout)
       if (loadState === 'not-found' && activeState === 'inactive') return this.absentUnit()
       if (loadState !== 'loaded') {
         throw new Error(
@@ -469,7 +482,7 @@ class SystemdScopeOwner implements BoundProcessOwner {
       if (!['active', 'activating', 'reloading', 'deactivating'].includes(activeState)) {
         throw new Error(`systemctl returned unknown ActiveState for ${this.unit}: ${JSON.stringify(activeState)}`)
       }
-      if (this.emptyRange(tasksCurrent)) {
+      if (this.emptyRange(tasksCurrent, controlGroup)) {
         this.releaseEmptyRange()
         return false
       }
@@ -655,6 +668,7 @@ export function prepareLinuxTerminalScope(
       internals.spawnSync ?? spawnSync,
       internals.systemctlQuery ?? querySystemctl,
       internals.sleep ?? sleepWithAbort,
+      internals.cgroupPopulated ?? linuxCgroupPopulated,
     ),
     resolveOutcome: outcome => startup.resolveOutcome(outcome),
     cleanup: () => { cleanupLinuxLaunchFiles(files) },
@@ -714,6 +728,7 @@ export function launchLinuxScope(
     internals.spawnSync ?? spawnSync,
     internals.systemctlQuery ?? querySystemctl,
     internals.sleep ?? sleepWithAbort,
+    internals.cgroupPopulated ?? linuxCgroupPopulated,
   )
   return {
     stdin: child.stdin,
