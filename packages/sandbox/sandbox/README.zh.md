@@ -77,6 +77,12 @@ kind: "package-reference"
 <details>
 <summary>实现细节——点击展开</summary>
 
+### Host 提供的访问权限
+
+`SandboxExecutionPolicy.readAccess` 携带明确的读取根目录及授权代数；见[授权与撤销](../sandbox-policy/README.zh.md)。
+
+可信服务产物可在当前授权代数内增加精确物理文件授权，记录设备与 inode，不开放父目录，并在换代时清除。文件读取与进程挂载拒绝替换后的 inode；这是 Host/服务接口，不接受模型直接申请路径授权。
+
 本节解释约定背后的设计决策，并指出实现它们的代码位置；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
 ### 设计理念

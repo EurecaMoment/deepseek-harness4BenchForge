@@ -7,6 +7,7 @@
 
 import { HarnessError } from '@deepseek-ai/dsh-llm'
 import type { Branded } from '@deepseek-ai/dsh-brand'
+import type { SandboxExecutionPolicy } from '@deepseek-ai/dsh-sandbox'
 
 /**
  * Opaque key for stale guards and target lookup. The local backend uses a
@@ -65,6 +66,8 @@ export interface FsTarget {
    * workspace-relative path, or remote URI depending on the backend.
    */
   displayPath: string
+  /** Trusted per-call authority attached by the resolving provider, never model JSON. */
+  sandboxPolicy?: SandboxExecutionPolicy
 }
 
 /**

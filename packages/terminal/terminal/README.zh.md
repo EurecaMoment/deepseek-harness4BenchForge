@@ -63,6 +63,10 @@ kind: "package-reference"
 <details>
 <summary>实现细节——点击展开</summary>
 
+### Host 提供的访问权限
+
+读取授权更新会使所属 Agent 的旧 PTY 失效，清理期间拒绝新输入，新终端等待关闭完成。
+
 本节解释服务背后的设计并指出实现它们的代码位置；可观察行为已在[使用本包](#use-this-package)中说明。
 
 ### 设计理念

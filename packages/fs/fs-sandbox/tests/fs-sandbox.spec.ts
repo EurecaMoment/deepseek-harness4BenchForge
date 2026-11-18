@@ -9,7 +9,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { existsSync, realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, parse } from 'node:path'
@@ -63,6 +63,121 @@ describe('the capability fact', () => {
   it('reports the deployment default mode (what the tool layer advertises against)', async () => {
     await boot('workspace-write')
     expect(fs.sandboxMode).toBe('workspace-write')
+  })
+})
+
+describe('explicit read isolation', () => {
+  it.skipIf(process.platform !== 'linux')('reads exact service outputs and rejects replacements, siblings, and expired grants', async () => {
+    await boot('workspace-write')
+    const session = Session.create(brandString<SessionId>('output-grants'))
+    ctx.sandboxPolicy.registerReadAccess(session, { policyId: 'outputs', epoch: 1, roots: [workspace] })
+    const policy = ctx.sandboxPolicy.resolve({ session })
+    const file = join(outside, 'output.txt')
+    const other = join(outside, 'other.txt')
+    await writeFile(file, 'own-result')
+    await writeFile(other, 'other-result')
+    ctx.sandboxPolicy.registerReadArtifact(policy, file)
+    const expanded = ctx.sandboxPolicy.resolve({ session })
+    expect(expanded.readAccess?.epoch).toBe(policy.readAccess?.epoch)
+    const output = await fs.resolve(file, { sandboxPolicy: expanded })
+    expect(await fs.readText(output)).toBe('own-result')
+    await expect(fs.resolve(other, { sandboxPolicy: expanded })).rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
+    await rename(file, join(outside, 'old-output.txt'))
+    await writeFile(file, 'replacement')
+    await expect(fs.readText(output)).rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
+    expect(() => ctx.sandboxPolicy.registerReadArtifact(policy, file)).toThrow('replaced')
+    ctx.sandboxPolicy.registerReadAccess(session, { policyId: 'outputs', epoch: 2, roots: [workspace] })
+    expect(ctx.sandboxPolicy.resolve({ session }).readAccess?.artifacts).toBeUndefined()
+    expect(() => ctx.sandboxPolicy.registerReadArtifact(policy, other)).toThrow('expired')
+  })
+
+  it.skipIf(process.platform !== 'linux')('pins mutation parents across symlink swaps and rejects linked edit sources', async () => {
+    await boot('workspace-write')
+    const session = Session.create(brandString<SessionId>('mutation-race'))
+    ctx.sandboxPolicy.registerReadAccess(session, { policyId: 'mutation', epoch: 1, roots: [workspace] })
+    const sandboxPolicy = ctx.sandboxPolicy.resolve({ session })
+    const directory = join(workspace, 'nested')
+    const retained = join(workspace, 'retained')
+    await mkdir(directory)
+    await writeFile(join(directory, 'file'), 'owned')
+    await writeFile(join(outside, 'file'), 'private')
+    const owned = await fs.resolve(join(directory, 'file'), { sandboxPolicy })
+    fs.internals.inspectTemp = async () => {
+      await rename(directory, retained)
+      await symlink(outside, directory)
+    }
+    expect((await fs.writeText(owned, 'updated')).before).toBe('owned')
+    expect(await readFile(join(outside, 'file'), 'utf8')).toBe('private')
+    expect(await readFile(join(retained, 'file'), 'utf8')).toBe('updated')
+    fs.internals = {}
+    await symlink(join(outside, 'file'), join(workspace, 'linked-file'))
+    const linked = await fs.resolve(join(workspace, 'linked-file'), { sandboxPolicy })
+    await expect(fs.editText(linked, { oldString: 'private', newString: 'changed', replaceAll: false })).rejects.toThrow()
+    expect(await readFile(join(outside, 'file'), 'utf8')).toBe('private')
+  })
+
+  it.skipIf(process.platform !== 'linux')('preserves version guards, parent creation, move, and delete under pinned mutations', async () => {
+    await boot('workspace-write')
+    const session = Session.create(brandString<SessionId>('mutation-semantics'))
+    ctx.sandboxPolicy.registerReadAccess(session, { policyId: 'mutation', epoch: 1, roots: [workspace] })
+    const sandboxPolicy = ctx.sandboxPolicy.resolve({ session })
+    const source = await fs.resolve(join(workspace, 'new', 'file'), { sandboxPolicy })
+    await fs.writeText(source, 'owned', { kind: 'createIfAbsent' })
+    const observed = await fs.stat(source)
+    if (observed === undefined) throw new Error('missing test file')
+    const edit = { oldString: 'owned', newString: 'updated', replaceAll: false }
+    const edited = await fs.editText(source, edit, { version: observed.version })
+    await expect(fs.editText(source, edit, { version: observed.version })).rejects.toMatchObject({ code: 'FS_STALE_VERSION' })
+    const destination = await fs.resolve(join(workspace, 'moved', 'file'), { sandboxPolicy })
+    const moved = await fs.moveFile(source, destination, { expectedSource: { version: edited.version }, expectedDestination: { kind: 'createIfAbsent' } })
+    expect(moved.sourceDeleted).toBe(true)
+    expect(await fs.readText(destination)).toBe('updated')
+    await fs.deleteFile(destination)
+    expect(await fs.stat(destination)).toBeUndefined()
+  })
+
+  it.skipIf(process.platform !== 'linux')('aborts staged writes when authority is revoked before publication', async () => {
+    await boot('workspace-write')
+    const session = Session.create(brandString<SessionId>('mutation-revoke'))
+    ctx.sandboxPolicy.registerReadAccess(session, { policyId: 'mutation', epoch: 1, roots: [workspace] })
+    const sandboxPolicy = ctx.sandboxPolicy.resolve({ session })
+    await writeFile(join(workspace, 'file'), 'owned')
+    fs.internals.inspectTemp = async () => {
+      ctx.sandboxPolicy.registerReadAccess(session, { policyId: 'mutation', epoch: 2, roots: [] })
+    }
+    await expect(fs.writeText(await fs.resolve('file', { cwd: workspace, sandboxPolicy }), 'changed')).rejects.toMatchObject({ code: 'FS_ABORTED' })
+    expect(await readFile(join(workspace, 'file'), 'utf8')).toBe('owned')
+  })
+
+  it('rejects sibling workspace resolution without changing legacy calls', async () => {
+    await boot('workspace-write')
+    const session = Session.create(brandString<SessionId>('isolated'))
+    ctx.sandboxPolicy.registerReadAccess(session, { policyId: 'a', epoch: 1, roots: [workspace] })
+    const sandboxPolicy = ctx.sandboxPolicy.resolve({ session })
+    await expect(fs.resolve(join(outside, 'secret'), { sandboxPolicy })).rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
+    await expect(fs.resolve(join(workspace, '..', 'out', 'secret'), { sandboxPolicy })).rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
+    await writeFile(join(outside, 'legacy'), 'available')
+    expect(await fs.readText(await fs.resolve(join(outside, 'legacy')))).toBe('available')
+  })
+
+  it.skipIf(process.platform !== 'linux')('reads authorized files but denies symlink traversal and expired targets', async () => {
+    await boot('workspace-write')
+    await writeFile(join(workspace, 'owned'), 'owned')
+    await writeFile(join(outside, 'secret'), 'other-session')
+    await symlink(outside, join(workspace, 'escape'))
+    const session = Session.create(brandString<SessionId>('isolated-linux'))
+    ctx.sandboxPolicy.registerReadAccess(session, { policyId: 'a', epoch: 1, roots: [workspace] })
+    const sandboxPolicy = ctx.sandboxPolicy.resolve({ session })
+    const owned = await fs.resolve('owned', { cwd: workspace, sandboxPolicy })
+    expect(await fs.readText(owned)).toBe('owned')
+    await expect(fs.watch(owned, () => {}, new AbortController().signal)).rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
+    const escape = await fs.resolve('escape/secret', { cwd: workspace, sandboxPolicy })
+    await expect(fs.readText(escape)).rejects.toThrow()
+    expect((await fs.listDir(await fs.resolve(workspace, { sandboxPolicy }))).map(entry => entry.name)).toEqual(['owned'])
+    ctx.sandboxPolicy.registerReadAccess(session, { policyId: 'a', epoch: 2, roots: [] })
+    await expect(fs.readText(owned)).rejects.toThrow('expired')
+    await expect(fs.writeText(owned, 'changed', undefined, undefined, sandboxPolicy)).rejects.toThrow('expired')
+    expect(await readFile(join(workspace, 'owned'), 'utf8')).toBe('owned')
   })
 })
 

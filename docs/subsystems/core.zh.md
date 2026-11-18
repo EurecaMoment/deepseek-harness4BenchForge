@@ -491,6 +491,18 @@ type Branded<B extends string> = string & { readonly [BRAND]: B }
 
 两个核心 ID 是 `ToolCallId`（关联工具调用及其结果；dsh-llm）和 `SessionId`（活跃 agent 与持久会话共享的标识；dsh-session）。能力包也会品牌化各自的 id，例如 [jobs.md](jobs.zh.md) 中的 `JobId`。
 
+## 创建准备
+
+`agent/create` waterfall 在 Session 存在之前接收可变的 `AgentCreationRequest`。可信 Host 可替换 `options`，将创建操作绑定到其工作区，然后调用 `next()`，保留调用方所有权。消费者使用已创建 Agent 的最终 Session cwd。
+
+```ts type-equiv
+/** Creation settings shared by ordered preparation hooks before a Session exists. */
+interface AgentCreationRequest {
+  /** Replace to prepare creation without mutating the caller's options object. */
+  options: CreateAgentOptions
+}
+```
+
 ## `TurnBoundaryProjection`
 
 `ctx.agents.turnBoundaryOf(session)` 读取已记录的轮次和步骤位置，无需活跃 Agent。注册表持有此状态；消费方不注册其投影定义。
@@ -881,6 +893,24 @@ Process-local assistant-stream publication. Chunk frames are transient; the loop
 Types: [Scoped](scope.zh.md)
 
 Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
+
+<a id="agentcreate--waterfall"></a>
+
+#### `agent/create` — waterfall
+
+Prepare creation metadata before the Session or Agent exists.
+
+```ts cordis-catalog
+/**
+ * Prepare creation metadata before the Session or Agent exists.
+ * @mode waterfall
+ * @param request - mutable creation envelope; replace its options before calling next.
+ * @param next - continue with the current envelope, preserving caller ownership.
+ */
+'agent/create'(request: AgentCreationRequest, next: () => Promise<AgentHandle>): Promise<AgentHandle>
+```
+
+Source: [`packages/core/agent/src/index.ts`](../../packages/core/agent/src/index.ts)
 
 <a id="agentcreated--serial"></a>
 

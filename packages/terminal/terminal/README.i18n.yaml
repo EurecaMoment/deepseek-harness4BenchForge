@@ -3,8 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/terminal/terminal/README.md
 /:
-  en: 3d90ab1819787962
-  zh: d5279e899341168a
+  en: cb3f91d54eee30e5
+  zh: cb3f91d54eee30e5
+/description-persistent-terminal-sessions-for-deployments-and-consumers-choosing-composing-or-extending-the-owner-scoped-ctx-terminals-service-kind-package-reference:
+  en: 65d56ea33a1b6281
+  zh: e94a17faea37c08d
 /deepseek-ai-dsh-terminal:
   en: 51faab4a45b4d0a3
   zh: c026cbe279584a55
@@ -12,8 +15,8 @@
   en: b275cca5aa0ccbd6
   zh: 0452420c4b45c7db
 /deepseek-ai-dsh-terminal/table-of-contents:
-  en: d152484eb41ac6b4
-  zh: 09388d293f9be9cb
+  en: eb6ed279e78f8b65
+  zh: 5583226de8ecca29
 /deepseek-ai-dsh-terminal/use-this-package:
   en: 51bfe428d2b44ee2
   zh: 557154468269985e
@@ -33,26 +36,29 @@
   en: 4fcedb18b5e8d5f2
   zh: d72bb1a45e45cfff
 /deepseek-ai-dsh-terminal/understand-the-implementation:
-  en: 0d0669b98b14a3dd
-  zh: 57416c205270e4e1
+  en: 57e15589824b2668
+  zh: 95f76747d673491d
+/deepseek-ai-dsh-terminal/understand-the-implementation/host-provided-access:
+  en: 41848a87bd2b13f8
+  zh: 874aece0720a94a5
 /deepseek-ai-dsh-terminal/understand-the-implementation/design-concept:
   en: 6bae42fb7275816f
   zh: 5f75e1b26074108c
 /deepseek-ai-dsh-terminal/understand-the-implementation/source-map:
-  en: 3ab5d082aa13d500
-  zh: e97b962d02e474b7
+  en: a91f022522d75747
+  zh: f589bb723afc459d
 /deepseek-ai-dsh-terminal/understand-the-implementation/data-model-and-lifecycle:
   en: a2adfa2708882e19
   zh: 002f257fd8c4addb
 /deepseek-ai-dsh-terminal/understand-the-implementation/ownership-and-cleanup-rules:
-  en: 3c977ec7192623b1
-  zh: 78d14a23e087808a
+  en: 6424cf4f642808b3
+  zh: c76cdd9748351585
 /deepseek-ai-dsh-terminal/understand-the-implementation/send-reservation:
   en: b80a540215116c43
   zh: 1dc651d09ceb4b15
 /deepseek-ai-dsh-terminal/further-exploration:
-  en: 8459a3b70a9f8bad
-  zh: 21372aa8939d2182
+  en: bafb3e5a90c51b22
+  zh: 8859068d9e4df258
 /deepseek-ai-dsh-terminal/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -69,11 +75,11 @@
   en: 2d1f12c1eb4164e5
   zh: 7d22b2cd3f9649ff
 /deepseek-ai-dsh-terminal/known-limitations-and-deferred-work:
-  en: a133ebc47a4df34f
-  zh: 9bb949487ee566d5
+  en: 9e59f9208da32f84
+  zh: 888977b9c6cf4140
 /deepseek-ai-dsh-terminal/known-limitations-and-deferred-work/dev-note:
-  en: 112f870e68bd1ff3
-  zh: 693f37bbd32497a0
+  en: 6364235b36fa501f
+  zh: d34cc6196af8851e
 /deepseek-ai-dsh-terminal/known-limitations-and-deferred-work/dev-note/undecided-directions:
-  en: 3c5203a9c40a38ef
-  zh: a7660ca08bd0d279
+  en: 7a6b2e6b11f69ea1
+  zh: 405257c26d1d4887

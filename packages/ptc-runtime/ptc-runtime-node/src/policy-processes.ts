@@ -21,6 +21,13 @@ export class PolicyProcesses {
    * @param ctx - Node provider lifecycle and Session services.
    */
   constructor(private readonly ctx: Context) {
+    ctx.on('sandbox/read-access-changed', (session) => {
+      for (const process of this.processes) {
+        if (process.sessionId !== session.id) continue
+        process.invalidated = true
+        void this.release(process).catch((error: unknown) => { ctx.logger.warn(error) })
+      }
+    }, { global: true })
     ctx.on('session/event', (session, event) => {
       if (event.type !== 'sandbox/mode') return
       for (const process of this.processes) {
@@ -41,6 +48,7 @@ export class PolicyProcesses {
    * @returns Removal after successful process cleanup.
    */
   register(policy: SandboxExecutionPolicy, release: () => Promise<void>): () => void {
+    if (policy.readAccess !== undefined) this.ctx.sandboxPolicy.assertReadAccess(policy)
     if (policy.sessionId === undefined) return () => {}
     const session = this.ctx.get('sessions')?.get(policy.sessionId)
     const process: Process = {

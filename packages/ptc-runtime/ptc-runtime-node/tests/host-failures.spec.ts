@@ -87,6 +87,28 @@ describe('Node runtime host failures', () => {
     expect(await h.start()).toEqual({ output: [], value: 42, sandbox: { mode: 'read-only', denied: false, enforcement: 'partial' } })
   })
 
+  it('refuses completed output when read authority changes during process cleanup', async () => {
+    const h = await setup({}, 'read-only')
+    const session = h.ctx.sessions.create(brandString<SessionId>('read-authority-cleanup'))
+    h.ctx.sandboxPolicy.registerReadAccess(session, { policyId: 'cleanup', epoch: 1, roots: [process.cwd()] })
+    const sandboxPolicy = h.ctx.sandboxPolicy.resolve({ session })
+    vi.spyOn(h.ctx.sandbox, 'confine').mockImplementation(async argv => confinement([...argv]))
+    const cleaning = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<boolean>()
+    h.waitForExit.mockImplementation(() => { cleaning.resolve(undefined); return release.promise })
+    h.onBoot(() => { h.complete({ value: encodePtcJsonWire('obsolete output') }) })
+    const pending = h.start({ ...request, sandboxPolicy })
+    const outcome = pending.catch((error: unknown) => error)
+    try {
+      await cleaning.promise
+      h.ctx.sandboxPolicy.registerReadAccess(session, { policyId: 'cleanup', epoch: 2, roots: [] })
+      release.resolve(true)
+      expect(await outcome).toMatchObject({ name: 'SandboxReadAccessError', code: 'SANDBOX_READ_ACCESS_DENIED' })
+      expect(h.terminate).toHaveBeenCalledOnce()
+      expect(h.waitForExit).toHaveBeenCalledOnce()
+    } finally { release.resolve(true); await outcome }
+  })
+
   it.each([['EACCES: blocked', true], ['EPERM: unrelated dialect', false]] as const)('uses only the selected denial dialect for %s', async (message, denied) => {
     const h = await setup({}, 'read-only')
     vi.spyOn(h.ctx.sandbox, 'confine').mockImplementation(async argv => confinement([...argv]))

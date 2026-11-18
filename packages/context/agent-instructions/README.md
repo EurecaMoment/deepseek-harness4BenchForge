@@ -83,6 +83,10 @@ When all files fit within `maxBytes` together, the message holds them with no bu
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+### Host-provided access
+
+Sessions with explicit read authority do not automatically discover workspace or user instruction files. Their Host supplies approved instructions through the existing prompt composition.
+
 This section explains the design decisions behind the plugin; the observable behavior is covered in [Use this package](#use-this-package).
 
 ### Design concept

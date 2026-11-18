@@ -95,6 +95,23 @@ async function setup(
 }
 
 describe('tool-str-replace-editor', () => {
+  it('applies explicit read authority to view and read-before-edit', async () => {
+    const { ctx, root, owner } = await setup({}, { sandboxMode: 'workspace-write' })
+    const allowed = join(root, 'allowed')
+    const path = join(root, 'private.txt')
+    await mkdir(allowed)
+    await writeFile(path, 'private')
+    ctx.sandboxPolicy.registerReadAccess(owner.session, { roots: [allowed], policyId: 'editor', epoch: 1 })
+    for (const args of [
+      { command: 'view', path },
+      { command: 'str_replace', path, old_str: 'private', new_str: 'changed' },
+      { command: 'insert', path, insert_line: 0, new_str: 'changed' },
+    ]) {
+      expect((await call(ctx, owner, args)).error).toMatchObject({ info: { code: 'FS_SANDBOX_DENIED' } })
+    }
+    expect(await readFile(path, 'utf8')).toBe('private')
+  })
+
   it('registers the standalone schema and configurable description', async () => {
     const { ctx, fiber } = await setup({ description: 'custom editor description' })
     const schema = ctx.tools.schemas()[0]

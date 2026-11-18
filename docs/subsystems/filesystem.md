@@ -27,6 +27,8 @@ interface FsTarget {
    * workspace-relative path, or remote URI depending on the backend.
    */
   displayPath: string
+  /** Trusted per-call authority attached by the resolving provider, never model JSON. */
+  sandboxPolicy?: SandboxExecutionPolicy
 }
 ```
 
@@ -419,7 +421,7 @@ watch(target: FsTarget, changed: (error?: Error) => void, signal: AbortSignal): 
  * @param opts - optional cwd override and cancellation signal.
  * @returns the stable target; the same file yields the same `targetKey`.
  */
-abstract resolve(path: string, opts?: { cwd?: string; signal?: AbortSignal }): Promise<FsTarget>
+abstract resolve(path: string, opts?: { cwd?: string; signal?: AbortSignal; sandboxPolicy?: SandboxExecutionPolicy }): Promise<FsTarget>
 
 /**
  * Return the canonical absolute path a subprocess in this filesystem's
@@ -481,7 +483,7 @@ abstract stat(target: FsTarget, signal?: AbortSignal): Promise<FsInfo | undefine
  * @param signal - aborts the metadata round-trip.
  * @returns metadata only, never content; undefined for an absent path.
  */
-abstract lstat(path: string, opts?: { cwd?: string }, signal?: AbortSignal): Promise<FsPathInfo | undefined>
+abstract lstat( path: string, opts?: { cwd?: string; sandboxPolicy?: SandboxExecutionPolicy }, signal?: AbortSignal, ): Promise<FsPathInfo | undefined>
 
 /**
  * Read the whole regular text file as a single decoded string.

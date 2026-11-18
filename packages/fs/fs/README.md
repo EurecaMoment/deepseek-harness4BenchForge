@@ -45,6 +45,10 @@ Through `ctx.fs`, resolve paths, read text or bounded bytes, list direct childre
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+### Host-provided access
+
+`resolve` accepts an optional trusted execution policy, which enforcing providers retain on the returned `FsTarget`; callers do not populate this field from model input.
+
 This section explains the design decisions behind the contract and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
 
 ### Design philosophy

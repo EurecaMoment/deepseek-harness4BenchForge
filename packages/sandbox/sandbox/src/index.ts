@@ -41,10 +41,31 @@ export type SandboxMode = 'read-only' | 'workspace-write' | 'danger-full-access'
 export type ConfinedSandboxMode = Exclude<SandboxMode, 'danger-full-access'>
 
 /**
- * The complete file-effect policy resolved for one capability call. The root
- * is carried even under modes that do not consume it so callers can resolve
- * policy once before choosing the enforcement path.
+ * Explicit read authority supplied by a trusted host. Processes using this
+ * authority also require isolated process visibility and no network access.
  */
+export interface SandboxReadAccess {
+  /** Complete physical read allow-list, including the workspace and runtime dependencies. */
+  readonly roots: readonly string[]
+  /** Trusted authority identity; changing its grants requires a new epoch. */
+  readonly policyId: string
+  /** Monotonically increasing authority generation. */
+  readonly epoch: number
+  /** Exact trusted output files; identity is checked again before reads and process mounts. */
+  readonly artifacts?: readonly SandboxReadArtifact[]
+}
+
+/** Physical inode of one trusted service output, never a directory grant. */
+export interface SandboxReadArtifact {
+  /** Canonical absolute filename. */
+  readonly path: string
+  /** Decimal filesystem device identity. */
+  readonly device: string
+  /** Decimal inode identity; replacement invalidates access. */
+  readonly inode: string
+}
+
+/** Complete execution policy; absent readAccess preserves unrestricted reads. */
 export interface SandboxExecutionPolicy {
   /** The file-effect mode this execution runs under. */
   mode: SandboxMode
@@ -66,6 +87,26 @@ export interface SandboxExecutionPolicy {
    * for agentless calls, which fall back to per-call backend state.
    */
   sessionId?: SessionId
+  /** Opt-in read isolation. Omission preserves the existing unrestricted-read policy. */
+  readAccess?: SandboxReadAccess
+}
+
+/**
+ * Identify retained execution authority, including immutable directory grants.
+ * @param policy - resolved authority whose fields are compared by value.
+ * @returns a deterministic policy identity for retained process owners.
+ */
+export function sandboxPolicyKey(policy: SandboxExecutionPolicy): string {
+  return JSON.stringify([policy.mode, policy.workspaceRoot, policy.sessionId,
+    policy.additionalWritableRoots ?? [], policy.readAccess ?? null])
+}
+
+/** A read grant was revoked or its execution snapshot is no longer current. */
+export class SandboxReadAccessError extends HarnessError {
+  constructor(message: string) {
+    super(message, 'SANDBOX_READ_ACCESS_DENIED')
+    this.name = 'SandboxReadAccessError'
+  }
 }
 
 /**

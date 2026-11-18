@@ -45,6 +45,10 @@ kind: "package-reference"
 <details>
 <summary>实现细节——点击展开</summary>
 
+### Host 提供的访问权限
+
+`resolve` 接受可选可信执行策略，实施隔离的提供方将其附在返回的 `FsTarget` 上；调用方不得从模型输入填充此字段。
+
 本节解释约定背后的设计决策，并指出实现它们的代码位置；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
 ### 设计理念

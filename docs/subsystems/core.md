@@ -479,6 +479,18 @@ type Branded<B extends string> = string & { readonly [BRAND]: B }
 
 The two core IDs are `ToolCallId` (correlates a tool call with its result; dsh-llm) and `SessionId` (the shared live agent and durable session identity; dsh-session). Capability packages brand their own ids too, such as `JobId` in [jobs.md](jobs.md).
 
+## Creation preparation
+
+The `agent/create` waterfall receives a mutable `AgentCreationRequest` before a Session exists. A trusted Host may replace `options` to bind creation to its workspace, then call `next()` with the caller ownership preserved. Consumers use the created Agent’s final Session cwd.
+
+```ts type-equiv
+/** Creation settings shared by ordered preparation hooks before a Session exists. */
+interface AgentCreationRequest {
+  /** Replace to prepare creation without mutating the caller's options object. */
+  options: CreateAgentOptions
+}
+```
+
 ## `TurnBoundaryProjection`
 
 `ctx.agents.turnBoundaryOf(session)` reads recorded turn and step positions without requiring a live Agent. The registry owns this state; consumers do not register its projection definition.
@@ -869,6 +881,24 @@ Process-local assistant-stream publication. Chunk frames are transient; the loop
 Types: [Scoped](scope.md)
 
 Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
+
+<a id="agentcreate--waterfall"></a>
+
+#### `agent/create` — waterfall
+
+Prepare creation metadata before the Session or Agent exists.
+
+```ts cordis-catalog
+/**
+ * Prepare creation metadata before the Session or Agent exists.
+ * @mode waterfall
+ * @param request - mutable creation envelope; replace its options before calling next.
+ * @param next - continue with the current envelope, preserving caller ownership.
+ */
+'agent/create'(request: AgentCreationRequest, next: () => Promise<AgentHandle>): Promise<AgentHandle>
+```
+
+Source: [`packages/core/agent/src/index.ts`](../../packages/core/agent/src/index.ts)
 
 <a id="agentcreated--serial"></a>
 

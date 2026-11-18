@@ -6,6 +6,7 @@
 
 import { Context, Service } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import type {} from '@deepseek-ai/dsh-sandbox-policy'
 import { TerminalBackendCleanupError, TerminalError } from './error.ts'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import type {
@@ -91,11 +92,24 @@ export class TerminalSessionService extends Service {
   private readonly pendingSpawns = new Map<Agent, Set<PendingSpawn>>()
   private readonly ownerCleanups = new Map<Agent, () => Promise<void> | void>()
   private readonly disposedOwners = new WeakSet<Agent>()
+  private readonly authorityCleanup = new Map<Agent, Promise<void>>()
   private nextId = 0
   private disposing = false
 
   constructor(ctx: Context) {
     super(ctx, 'terminals')
+    ctx.on('sandbox/read-access-changed', (session) => {
+      const owners = new Set([...this.pendingSpawns.keys(), ...[...this.sessions.values()].map(record => record.owner)])
+      for (const owner of owners) {
+        if (owner.session.id !== session.id) continue
+        const closing = this.abortAndClose(owner,
+          new TerminalError('PTY read authority changed', 'OWNER_NOT_LIVE'), 'PTY read authority changed')
+        this.authorityCleanup.set(owner, closing)
+        void closing.then(() => {
+          if (this.authorityCleanup.get(owner) === closing) this.authorityCleanup.delete(owner)
+        }, (error: unknown) => { ctx.logger.warn(error) })
+      }
+    }, { global: true })
     ctx.effect(() => () => this.disposeAll(), 'pty teardown')
   }
 
@@ -134,6 +148,8 @@ export class TerminalSessionService extends Service {
    * @returns published identity, metadata, status, and MOTD.
    */
   async spawn(owner: Agent, request: TerminalSpawnRequest, signal?: AbortSignal): Promise<TerminalSpawnResult> {
+    const cleanup = this.authorityCleanup.get(owner)
+    if (cleanup !== undefined) await cleanup
     this.assertActive()
     signal?.throwIfAborted()
     this.ensureOwnerCleanup(owner)
@@ -157,7 +173,7 @@ export class TerminalSessionService extends Service {
         ...request.cwd !== undefined ? { cwd: request.cwd } : {},
         signal: backendSignal,
       })
-      signal?.throwIfAborted()
+      backendSignal.throwIfAborted()
       if (this.disposing) {
         throw new TerminalError('PTY service is disposing', 'SERVICE_DISPOSING')
       }
@@ -367,6 +383,7 @@ export class TerminalSessionService extends Service {
   }
 
   private expectOwned(owner: Agent, id: TerminalSessionId): SessionRecord {
+    if (this.authorityCleanup.has(owner)) throw new TerminalError('PTY read authority changed; previous sessions are closing', 'SESSION_CLOSING')
     const record = this.sessions.get(id)
     if (record === undefined) throw new TerminalError(`unknown PTY session ${id}`, 'NO_SESSION')
     if (record.owner !== owner) throw new TerminalError(`PTY session ${id} belongs to another agent`, 'FOREIGN_SESSION')

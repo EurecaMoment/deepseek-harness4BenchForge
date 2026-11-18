@@ -60,6 +60,19 @@ async function baseContext(): Promise<Context> {
 }
 
 describe('Session creation failures', () => {
+  it('keeps the created directory when a host redirects creation away from the requested Workspace', async () => {
+    const ctx = await baseContext()
+    const attachSession = vi.fn(async () => {})
+    const workspace = { id: 'original' as WorkspaceId, path: '/original', sessionIds: [], attachSession }
+    ctx.provide('workspaceRegistry', { get: () => workspace, list: () => [workspace], archivedSessionIds: [] } as never)
+    const createSession: ApiSessionAgentController['createSession'] = request =>
+      publishedSession(ctx, brandString<SessionId>('redirected'))({ ...request, cwd: '/isolated/session' })
+    const controller = new SessionCommandController(ctx, controllerAgents(ctx, { createSession }), '/default')
+    expect(await controller.create({ workspaceId: workspace.id })).toEqual({ sessionId: 'redirected' })
+    expect(attachSession).not.toHaveBeenCalled()
+    await ctx.fiber.dispose()
+  })
+
   it('creates in the default cwd without a named identity when no explicit target is supplied', async () => {
     const ctx = await baseContext()
     ctx.provide('workspaceRegistry', { get: () => undefined, list: () => [], archivedSessionIds: [] } as never)

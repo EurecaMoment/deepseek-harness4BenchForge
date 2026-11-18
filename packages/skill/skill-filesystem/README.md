@@ -92,6 +92,10 @@ A valid skill under any scanned root appears in the session catalog sorted by na
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+### Host-provided access
+
+A `trustedSourcesOnly` lookup discovers only explicit custom and bundled roots and refuses project/user candidates during loading.
+
 This section explains how discovery and watching are organized; the observable behavior is fully covered in [Use this package](#use-this-package).
 
 ### Design concept

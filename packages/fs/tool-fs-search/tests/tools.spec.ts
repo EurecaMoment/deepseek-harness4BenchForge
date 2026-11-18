@@ -15,6 +15,11 @@ import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import SandboxPolicyService from '@deepseek-ai/dsh-sandbox-policy'
+import SandboxProvider from '@deepseek-ai/dsh-sandbox'
+import type { SandboxPolicy, ConfinedArgv } from '@deepseek-ai/dsh-sandbox'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
+import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import { createScope, type Scope } from '@deepseek-ai/dsh-scope'
 import { join, sep } from 'node:path'
 import { createUserMessage, type ToolCallId } from '@deepseek-ai/dsh-llm'
@@ -247,6 +252,35 @@ function matchLine(path: string, lineNumber: number, lineText: string): string {
 }
 
 describe('registration', () => {
+  it('confines both search tools when the session has explicit read grants', async () => {
+    const { ctx, subprocess } = await setup()
+    await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(SandboxPolicyService, { mode: 'workspace-write' })
+    class RecordingSandbox extends SandboxProvider {
+      override async confine(argv: readonly string[], _policy: SandboxPolicy): Promise<ConfinedArgv> {
+        return { argv: ['isolated-runner', ...argv], enforcement: 'full', denialSignatures: [], runnerFailureRules: [] }
+      }
+    }
+    await ctx.plugin(RecordingSandbox)
+    const session = Session.create(SessionId('search-isolated'))
+    ctx.sandboxPolicy.registerReadAccess(session, { policyId: 'search', epoch: 1, roots: [process.cwd()] })
+    for (const name of ['glob', 'grep']) {
+      const result = await call(ctx, name, { pattern: name === 'glob' ? '*.txt' : 'secret' }, { agent: { session } })
+      expect(result.isError).toBeFalsy()
+      expect(subprocess.spawns.at(-1)?.argv[0]).toBe('isolated-runner')
+      expect(subprocess.spawns.at(-1)?.argv).toContain('--no-config')
+    }
+    subprocess.handler = () => {
+      ctx.sandboxPolicy.registerReadAccess(session, { policyId: 'search', epoch: 2, roots: [] })
+      return runResult('private-result\0')
+    }
+    const revoked = await call(ctx, 'glob', { pattern: '*' }, { agent: { session } })
+    expect(revoked.isError).toBe(true)
+    expect(subprocess.handles.at(-1)?.terminated).toBe(true)
+    expect(text(revoked)).not.toContain('private-result')
+    await ctx.fiber.dispose()
+  })
+
   it('registers glob and grep unconditionally with their prompt sections', async () => {
     const { ctx, subprocess } = await setup()
     // Registration performs NO load-time probe: the packaged binary is always

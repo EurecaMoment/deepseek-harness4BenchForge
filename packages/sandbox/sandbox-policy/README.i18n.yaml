@@ -3,8 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/sandbox/sandbox-policy/README.md
 /:
-  en: abf71058974a6f37
-  zh: 45c76c1d645a0e67
+  en: cb3f91d54eee30e5
+  zh: cb3f91d54eee30e5
+/description-the-shared-per-call-sandbox-policy-resolver-and-current-model-context-for-users-and-maintainers-composing-configuring-or-debugging-file-effect-policy-across-enforcing-capabilities-kind-package-reference:
+  en: a2100d1f3dbdf4fa
+  zh: 309bbbaf9879fab3
 /deepseek-ai-dsh-sandbox-policy:
   en: 2d1bbc7770b371d4
   zh: 5e0784ae0e0f3a82
@@ -12,8 +15,8 @@
   en: 62e1a0a017d6bc07
   zh: 1d9f86eb54f51b8e
 /deepseek-ai-dsh-sandbox-policy/table-of-contents:
-  en: d152484eb41ac6b4
-  zh: 09388d293f9be9cb
+  en: eb6ed279e78f8b65
+  zh: 5583226de8ecca29
 /deepseek-ai-dsh-sandbox-policy/use-this-package:
   en: a75f214ba848bbd1
   zh: 8ad35e2513b53bd1
@@ -21,8 +24,8 @@
   en: 6704447e52ec295b
   zh: 9ed812d9e29d5533
 /deepseek-ai-dsh-sandbox-policy/use-this-package/minimal-configuration:
-  en: 4425f5a22850d740
-  zh: 7dfd299ade0fc561
+  en: ce9d643402d49da8
+  zh: 6af45cc5d276933c
 /deepseek-ai-dsh-sandbox-policy/use-this-package/registering-a-session-s-writable-directory:
   en: 841ea47ef1ed7ee6
   zh: cd573e67a67742e2
@@ -33,8 +36,11 @@
   en: 9cef5f64a050f468
   zh: 5dc42c148b2c902d
 /deepseek-ai-dsh-sandbox-policy/understand-the-implementation:
-  en: 2d560aa6681fcfb8
-  zh: e1c6361a6fa40c63
+  en: 57e15589824b2668
+  zh: 95f76747d673491d
+/deepseek-ai-dsh-sandbox-policy/understand-the-implementation/host-provided-access:
+  en: ed656981e3a0e93e
+  zh: ddc08cd213257e61
 /deepseek-ai-dsh-sandbox-policy/understand-the-implementation/resolution-precedence:
   en: f1f38b10c23947d2
   zh: 7a591e743d6793f5
@@ -45,11 +51,11 @@
   en: af0d19c6de17a272
   zh: d90e538f9ac85b77
 /deepseek-ai-dsh-sandbox-policy/understand-the-implementation/source-map:
-  en: cc7dd675c9915f7d
-  zh: d719c4f9de39873a
+  en: 7fdc5b12788bcf85
+  zh: 77fd388d4f2322a8
 /deepseek-ai-dsh-sandbox-policy/further-exploration:
-  en: 7b110e18967f2754
-  zh: 823c261edeae750a
+  en: f914e1c3fa7cb0f5
+  zh: 1e83b998a502498b
 /deepseek-ai-dsh-sandbox-policy/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -78,8 +84,8 @@
   en: a16a657e0e5145fb
   zh: 4b19263a728990dc
 /deepseek-ai-dsh-sandbox-policy/known-limitations-and-deferred-work:
-  en: 8582027d60300aaf
-  zh: c30cfcebf8a63e99
+  en: 404f72592d870d9a
+  zh: 6acfa2cbd317b590
 /deepseek-ai-dsh-sandbox-policy/known-limitations-and-deferred-work/dev-note:
-  en: e67f633dc6fe7773
-  zh: 3bb0c20c93f16f98
+  en: 34651d247c0d1bba
+  zh: b8b78bf26d28e4d6

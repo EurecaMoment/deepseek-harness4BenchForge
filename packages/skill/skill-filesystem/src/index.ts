@@ -184,7 +184,7 @@ export class FileSystemSkillProvider implements SkillProvider {
    *   logged and omitted; root or watcher failures make the observation incomplete.
    */
   async list(options: SkillLookupOptions): Promise<SkillCandidate[] | SkillProviderObservation> {
-    const roots = await this.roots(options.cwd)
+    const roots = await this.roots(options.cwd, options.trustedSourcesOnly === true)
     let complete = true
     try {
       await this.watchManager.observeRoots(roots)
@@ -215,6 +215,7 @@ export class FileSystemSkillProvider implements SkillProvider {
    * @returns the full local skill, or `undefined` if the file disappeared.
    */
   async get(candidate: SkillCandidate, options: SkillLookupOptions): Promise<SkillDefinition | undefined> {
+    if (options.trustedSourcesOnly === true && candidate.source !== 'bundled' && candidate.source !== 'custom') return undefined
     const locator = candidate.locator as LocalLocator
     const parsed = await parseSkillFile(locator.path, this.ctx, options.signal, candidate.source === 'bundled')
     if (parsed === undefined) return undefined
@@ -249,9 +250,9 @@ export class FileSystemSkillProvider implements SkillProvider {
     return this.disposal
   }
 
-  private async roots(cwd: string | undefined): Promise<SkillRoot[]> {
+  private async roots(cwd: string | undefined, trustedSourcesOnly: boolean): Promise<SkillRoot[]> {
     const roots: SkillRoot[] = []
-    if (this.includeDefaultRoots && cwd !== undefined) {
+    if (this.includeDefaultRoots && !trustedSourcesOnly && cwd !== undefined) {
       const projectRoot = await findProjectRoot(resolve(cwd), optionalFileSystem(this.ctx))
       roots.push(
         { path: join(projectRoot, '.dsh/skills'), source: 'project-dsh', rank: PROJECT_DSH_RANK, projectRoot },
@@ -259,7 +260,7 @@ export class FileSystemSkillProvider implements SkillProvider {
       )
     }
     roots.push(...this.customSkillDirs.map(path => ({ path, source: 'custom' as const, rank: CUSTOM_RANK })))
-    if (this.includeDefaultRoots) {
+    if (this.includeDefaultRoots && !trustedSourcesOnly) {
       roots.push(
         { path: join(this.dshHome, 'skills'), source: 'user-dsh', rank: USER_DSH_RANK, skipSystem: true },
         { path: join(this.agentsHome, 'skills'), source: 'user-agents', rank: USER_AGENTS_RANK },

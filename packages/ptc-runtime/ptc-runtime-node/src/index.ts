@@ -125,19 +125,23 @@ export class NodePtcRuntime extends PtcRuntime {
     const initialization = this.initializer?.program
     const controller = new AbortController()
     const completion = Promise.withResolvers<void>()
-    const unregister = spec.sandboxPolicy === undefined ? undefined : this.processes.register(spec.sandboxPolicy, async () => {
-      controller.abort(new Error('sandbox mode changed'))
-      await completion.promise
-    })
+    let unregister: (() => void) | undefined
     const live = { controller, finished: completion.promise }
     this.live.add(live)
     try {
       await this.processes.wait(spec.sandboxPolicy?.sessionId)
+      if (spec.sandboxPolicy !== undefined) this.ctx.sandboxPolicy.assertReadAccess(spec.sandboxPolicy)
+      unregister = spec.sandboxPolicy === undefined ? undefined : this.processes.register(spec.sandboxPolicy, async () => {
+        controller.abort(new Error('sandbox authority changed'))
+        await completion.promise
+      })
       // Disposal can begin while a previous policy's process cleanup is pending.
       // oxlint-disable-next-line typescript/no-unnecessary-condition
       if (this.disposed) throw new PtcRuntimeError(`${this.retainsState ? 'persistent PTC' : 'ptc-runtime-node'}: run after disposal`, 'PTC_RUNTIME_UNAVAILABLE')
       const signal = spec.signal === undefined ? controller.signal : AbortSignal.any([spec.signal, controller.signal])
-      return await this.execution.run({ ...spec, signal }, initialization)
+      const result = await this.execution.run({ ...spec, signal }, initialization)
+      if (spec.sandboxPolicy !== undefined) this.ctx.sandboxPolicy.assertReadAccess(spec.sandboxPolicy)
+      return result
     } finally {
       unregister?.()
       this.live.delete(live)

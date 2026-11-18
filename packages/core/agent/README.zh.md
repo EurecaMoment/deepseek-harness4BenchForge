@@ -87,6 +87,10 @@ await handle.agent.whenIdle()
 <details>
 <summary>实现细节——点击展开</summary>
 
+### Host 提供的访问权限
+
+`agent/create` waterfall 在工厂创建 Session 前处理 `CreateAgentOptions`。监听器替换 `request.options` 后用 `next()` 继续调用，调用方所有权及工厂回滚行为保持不变。
+
 本节解释该包如何实现上述行为；可观察约定已在[使用本包](#use-this-package)中完整说明。
 
 ### 设计理念

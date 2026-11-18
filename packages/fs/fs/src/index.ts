@@ -146,7 +146,7 @@ export abstract class FileSystem extends Service {
    * @param opts - optional cwd override and cancellation signal.
    * @returns the stable target; the same file yields the same `targetKey`.
    */
-  abstract resolve(path: string, opts?: { cwd?: string; signal?: AbortSignal }): Promise<FsTarget>
+  abstract resolve(path: string, opts?: { cwd?: string; signal?: AbortSignal; sandboxPolicy?: SandboxExecutionPolicy }): Promise<FsTarget>
 
   /**
    * Return the canonical absolute path a subprocess in this filesystem's
@@ -211,7 +211,9 @@ export abstract class FileSystem extends Service {
    * @param signal - aborts the metadata round-trip.
    * @returns metadata only, never content; undefined for an absent path.
    */
-  abstract lstat(path: string, opts?: { cwd?: string }, signal?: AbortSignal): Promise<FsPathInfo | undefined>
+  abstract lstat(
+    path: string, opts?: { cwd?: string; sandboxPolicy?: SandboxExecutionPolicy }, signal?: AbortSignal,
+  ): Promise<FsPathInfo | undefined>
 
   /**
    * Read the whole regular text file as a single decoded string.

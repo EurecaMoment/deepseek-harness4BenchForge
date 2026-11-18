@@ -66,6 +66,12 @@ Seatbelt、bwrap 和 Landlock 在 `workspace-write` 下包含策略显式指定�
 <details>
 <summary>实现细节——点击展开</summary>
 
+### Host 提供的访问权限
+
+明确的读取授权要求 bubblewrap。受限配置仅挂载授权物理路径，隔离进程和网络，清空环境并提供私有临时目录。Host 须列出解释器、加载器、库和所需可执行文件，不会自动开放仓库或用户主目录。
+
+可信服务产物可在当前授权代数内增加精确物理文件授权，记录设备与 inode，不开放父目录，并在换代时清除。文件读取与进程挂载拒绝替换后的 inode；这是 Host/服务接口，不接受模型直接申请路径授权。
+
 本节解释 runner 选择、各平台 profile 与失败方言；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
 ### runner 选择

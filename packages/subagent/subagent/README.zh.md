@@ -89,6 +89,10 @@ kind: "package-reference"
 <details>
 <summary>实现细节——点击展开</summary>
 
+### Host 提供的访问权限
+
+若 `agent/create` hook 改写目录，子 Agent 的初始有效目录使用改写结果；否则保留原有指定目录语义。
+
 本节解释服务的构建方式以及可观察行为从何而来；完整约定见[使用本包](#use-this-package)。
 
 ### 设计理念

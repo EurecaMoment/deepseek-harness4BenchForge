@@ -66,6 +66,12 @@ Seatbelt, bwrap, and Landlock include the policy's explicit `additionalWritableR
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+### Host-provided access
+
+Explicit read grants require bubblewrap. The restricted profile mounts only authorized physical paths, isolates process and network namespaces, clears the environment, and supplies private temporary storage. The Host includes the interpreter, loader, libraries, and executable files it needs; no repository or home directory is granted automatically.
+
+Trusted service outputs may add exact physical file grants within the current authority generation. These grants record device and inode, expose no parent directory, and disappear when the generation changes. File reads and process mounts reject replacement inodes; this is a Host/service API, never a model-supplied permission request.
+
 This section explains runner selection, the per-platform profiles, and the failure dialects; the observable behavior is fully covered in [Use this package](#use-this-package).
 
 ### Runner selection

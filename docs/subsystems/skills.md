@@ -194,6 +194,8 @@ Full definitions are not cached by the registry. Each `get()` calls the winning 
 ```ts type-equiv
 /** Caller context used for cwd-sensitive and abortable provider work. */
 interface SkillLookupOptions {
+  /** Restrict automatic filesystem discovery to explicitly configured and bundled sources; omission includes defaults. */
+  readonly trustedSourcesOnly?: boolean | undefined
   /** Workspace selector for the current lookup. */
   readonly cwd?: string | undefined
   /** Abort discovery or loading work for the current caller. */

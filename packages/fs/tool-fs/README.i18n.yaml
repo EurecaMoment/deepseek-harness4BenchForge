@@ -3,8 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/fs/tool-fs/README.md
 /:
-  en: 52b93805befe8077
-  zh: 9786e662303f0e2f
+  en: cb3f91d54eee30e5
+  zh: cb3f91d54eee30e5
+/description-the-model-facing-read-read-image-write-and-edit-tools-for-users-and-maintainers-composing-or-debugging-filesystem-access-for-agents-kind-package-reference:
+  en: 354b138315f641c5
+  zh: a784663a3398160c
 /deepseek-ai-dsh-tool-fs:
   en: fc8f28deebe5fa6b
   zh: 738c6ad45034da88
@@ -12,8 +15,8 @@
   en: 173acfd5398446eb
   zh: 7dc971cd218fc2e3
 /deepseek-ai-dsh-tool-fs/table-of-contents:
-  en: d152484eb41ac6b4
-  zh: 09388d293f9be9cb
+  en: eb6ed279e78f8b65
+  zh: 5583226de8ecca29
 /deepseek-ai-dsh-tool-fs/use-this-package:
   en: c7da73c9e2691ea1
   zh: 0eba82c1c3553ab9
@@ -21,11 +24,11 @@
   en: f0845fd087912fe4
   zh: 4cae06864c73f710
 /deepseek-ai-dsh-tool-fs/use-this-package/the-tools:
-  en: 6e12ea9c79039360
-  zh: 7230ad3bda4515d5
+  en: 091fe3e2c95c8142
+  zh: 4dbd8a05745bb97e
 /deepseek-ai-dsh-tool-fs/use-this-package/configuration:
-  en: 92b0a816b47159e9
-  zh: 1b6ce7b0c7216886
+  en: 015e5d4df54c7873
+  zh: ef5c773b0f8cb734
 /deepseek-ai-dsh-tool-fs/use-this-package/policy-and-sandbox-behavior:
   en: 9bddebaf4aff0a8d
   zh: fea0196162e3fcd1
@@ -33,14 +36,17 @@
   en: c11d53e4d0b9c13f
   zh: 229b232009c42986
 /deepseek-ai-dsh-tool-fs/understand-the-implementation:
-  en: e30f7038c28e93f8
-  zh: a3868dbd90367b13
+  en: 57e15589824b2668
+  zh: 95f76747d673491d
+/deepseek-ai-dsh-tool-fs/understand-the-implementation/host-provided-access:
+  en: 824049575f98cb6d
+  zh: f5c077c05d5d733f
 /deepseek-ai-dsh-tool-fs/understand-the-implementation/design-concept:
   en: 1f4d7213aa3d0d60
   zh: aa6573f96c8b5220
 /deepseek-ai-dsh-tool-fs/understand-the-implementation/source-map:
-  en: 8be089bfe40bb7ab
-  zh: 7753de2feca62205
+  en: 62033605913b4c0f
+  zh: b52fc45b90658723
 /deepseek-ai-dsh-tool-fs/understand-the-implementation/per-tool-flow:
   en: 35fbee1ef9811806
   zh: 17c725e2b742c073
@@ -48,8 +54,8 @@
   en: 2bd1d4eb86c2b360
   zh: 2a52540af8c85e5f
 /deepseek-ai-dsh-tool-fs/further-exploration:
-  en: 485bc55482f576bc
-  zh: fc5fa55b41098bd0
+  en: 59f2a4d4a76f6ad2
+  zh: 7dfd33bae9f8cf3f
 /deepseek-ai-dsh-tool-fs/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -153,8 +159,8 @@
   en: d3a98306460d7f9f
   zh: 59836b4f59b8214a
 /deepseek-ai-dsh-tool-fs/known-limitations-and-deferred-work:
-  en: 65fcdbac04e2e889
-  zh: 4b6d02f630c81900
+  en: af86cb40ea811468
+  zh: d2194ba4221b6827
 /deepseek-ai-dsh-tool-fs/known-limitations-and-deferred-work/dev-note:
-  en: e67f633dc6fe7773
-  zh: 3bb0c20c93f16f98
+  en: 34651d247c0d1bba
+  zh: b8b78bf26d28e4d6

@@ -48,6 +48,22 @@ import {
 } from './fsio.ts'
 import type { FsIoInternals, PathInfo } from './fsio.ts'
 
+/** Prepared mutation path owned by a stricter filesystem provider. */
+export interface LocalMutationTarget extends FsTarget {
+  /** Reject final-component symlinks on mutation reads and pin staging directories. */
+  noFollow?: boolean
+  /** Optional authority revocation combined with the caller's cancellation. */
+  authoritySignal?: AbortSignal
+}
+
+/** Owned mutation target; its descriptor lifetime covers all effects and diff reads. */
+export interface LocalMutationLease {
+  /** Prepared path and optional no-follow I/O behavior. */
+  target: LocalMutationTarget
+  /** Release provider resources after the mutation settles. */
+  dispose(): Promise<void>
+}
+
 /** Configuration for the local filesystem backend. */
 export interface Config {
   /** Base directory for relative paths. Defaults to `process.cwd()`. */
@@ -121,9 +137,31 @@ export class LocalFileSystem extends FileSystem {
     this.config = resolved
   }
 
-  /** Run one mutation under the same lock ordering as multi-target operations. */
-  private withLock<T>(targetKey: string, op: () => Promise<T>): Promise<T> {
-    return this.withLocks([targetKey], op)
+  /**
+   * Prepare a mutation target while holding its logical-path lock.
+   * @param target - stable caller identity; stricter providers may pin its parent.
+   * @param _createParents - whether this mutation can create missing parent directories.
+   * @returns the prepared path and its owned cleanup.
+   */
+  protected prepareMutationTarget(target: FsTarget, _createParents: boolean): Promise<LocalMutationLease> {
+    return Promise.resolve({ target, dispose: () => Promise.resolve() })
+  }
+
+  /** Acquire logical-path locks before opening provider-owned mutation resources. */
+  private withMutation<const Targets extends readonly FsTarget[], T>(
+    targets: Targets,
+    operation: (targets: { [K in keyof Targets]: LocalMutationTarget }) => Promise<T>,
+    createParents: readonly FsTarget[] = [],
+  ): Promise<T> {
+    return this.withLocks(targets.map(target => target.targetKey), async () => {
+      const leases: LocalMutationLease[] = []
+      try {
+        for (const target of targets) leases.push(await this.prepareMutationTarget(target, createParents.includes(target)))
+        return await operation(leases.map(lease => lease.target) as { [K in keyof Targets]: LocalMutationTarget })
+      } finally {
+        await Promise.all(leases.map(lease => lease.dispose()))
+      }
+    })
   }
 
   /** Acquire distinct keys in lexical order and release inner locks before outer locks. */
@@ -220,7 +258,10 @@ export class LocalFileSystem extends FileSystem {
     expected?: FsWriteIntent,
     signal?: AbortSignal,
   ): Promise<FsWriteOutcome> {
-    return this.withLock(target.targetKey, async () => {
+    return this.withMutation([target], async (prepared) => {
+      const target = prepared[0]
+      signal = target.authoritySignal === undefined ? signal
+        : signal === undefined ? target.authoritySignal : AbortSignal.any([signal, target.authoritySignal])
       const existing = await this.writeTarget(target, expected)
 
       // Capture an optional contextual-diff basis before the write. The bounded
@@ -231,11 +272,11 @@ export class LocalFileSystem extends FileSystem {
       const diffable = existing !== null
         && Buffer.byteLength(content, 'utf8') < this.config.diffBasisMaxBytes
       const before = diffable
-        ? await readTextForDiff(target.targetKey, this.config.diffBasisMaxBytes, signal)
+        ? await readTextForDiff(target.targetKey, this.config.diffBasisMaxBytes, signal, target.noFollow)
         : null
       await writeFileAtomic(target.targetKey, content, existing?.mode, signal, this.internals,
-        { displayPath: target.displayPath, createIfAbsent: expected?.kind === 'createIfAbsent' })
-      const after = await probe(target.targetKey)
+        { displayPath: target.displayPath, noFollow: target.noFollow, createIfAbsent: expected?.kind === 'createIfAbsent' })
+      const after = await probe(target.targetKey, target.noFollow)
       return {
         operation: existing ? 'update' : 'create',
         version: this.versionAfterWrite(after, target),
@@ -245,7 +286,7 @@ export class LocalFileSystem extends FileSystem {
         // is a storage detail the applied-hunk diff ignores.
         after: normalizeLineEndings(content),
       }
-    })
+    }, [target])
   }
 
   override async editText(
@@ -254,8 +295,11 @@ export class LocalFileSystem extends FileSystem {
     expected?: { version: FsVersion },
     signal?: AbortSignal,
   ): Promise<FsEditOutcome> {
-    return this.withLock(target.targetKey, async () => {
-      const existing = await probe(target.targetKey)
+    return this.withMutation([target], async (prepared) => {
+      const target = prepared[0]
+      signal = target.authoritySignal === undefined ? signal
+        : signal === undefined ? target.authoritySignal : AbortSignal.any([signal, target.authoritySignal])
+      const existing = await probe(target.targetKey, target.noFollow)
       // Stale guard before literal matching: an edit based on an old read reports
       // FS_STALE_VERSION, not FS_EDIT_NOT_FOUND/FS_AMBIGUOUS_EDIT against newer content.
       // Missing targets use the same stale code on guarded and unconditional edit paths.
@@ -268,12 +312,13 @@ export class LocalFileSystem extends FileSystem {
         throw new FsError(`cannot edit "${target.displayPath}": file changed since it was read`, 'FS_STALE_VERSION')
       }
 
-      const original = await readForEdit(target.targetKey, target.displayPath, signal)
+      const original = await readForEdit(target.targetKey, target.displayPath, signal, target.noFollow)
       const edited = applyLiteralEdit(original.content, edit.oldString, edit.newString, edit.replaceAll, target.displayPath)
       const content = restoreLineEndings(edited.content, original.lineEndings)
-      await writeFileAtomic(target.targetKey, content, existing.mode, signal, this.internals, { displayPath: target.displayPath })
+      await writeFileAtomic(target.targetKey, content, existing.mode, signal, this.internals,
+        { displayPath: target.displayPath, noFollow: target.noFollow })
 
-      const after = await probe(target.targetKey)
+      const after = await probe(target.targetKey, target.noFollow)
       return {
         version: this.versionAfterWrite(after, target),
         // The LF-normalized before/after text (the applied-hunk diff basis);
@@ -287,20 +332,26 @@ export class LocalFileSystem extends FileSystem {
   override async patchText(
     target: FsTarget, hunks: readonly PatchHunk[], expected?: { version: FsVersion }, signal?: AbortSignal,
   ): Promise<FsEditOutcome> {
-    return this.withLock(target.targetKey, async () => {
+    return this.withMutation([target], async (prepared) => {
+      const target = prepared[0]
+      signal = target.authoritySignal === undefined ? signal
+        : signal === undefined ? target.authoritySignal : AbortSignal.any([signal, target.authoritySignal])
       const existing = await this.requireFile(target, expected, 'patch')
-      const original = await readForEdit(target.targetKey, target.displayPath, signal)
+      const original = await readForEdit(target.targetKey, target.displayPath, signal, target.noFollow)
       const after = this.patchContent(target, original.content, hunks)
       await writeFileAtomic(target.targetKey, restoreLineEndings(after, original.lineEndings), existing.mode, signal, this.internals,
-        { displayPath: target.displayPath })
-      return { version: this.versionAfterWrite(await probe(target.targetKey), target), before: original.content, after }
+        { displayPath: target.displayPath, noFollow: target.noFollow })
+      return { version: this.versionAfterWrite(await probe(target.targetKey, target.noFollow), target), before: original.content, after }
     })
   }
 
   override async deleteFile(target: FsTarget, expected?: { version: FsVersion }, signal?: AbortSignal): Promise<FsDeleteOutcome> {
-    return this.withLock(target.targetKey, async () => {
+    return this.withMutation([target], async (prepared) => {
+      const target = prepared[0]
+      signal = target.authoritySignal === undefined ? signal
+        : signal === undefined ? target.authoritySignal : AbortSignal.any([signal, target.authoritySignal])
       await this.requireFile(target, expected, 'delete')
-      const before = await readTextForDiff(target.targetKey, this.config.diffBasisMaxBytes, signal)
+      const before = await readTextForDiff(target.targetKey, this.config.diffBasisMaxBytes, signal, target.noFollow)
       await this.internals.inspectBeforeMutation?.(target)
       if (signal?.aborted) throw new FsError('delete aborted', 'FS_ABORTED')
       await removeFile(target.targetKey, target.displayPath, this.internals)
@@ -314,25 +365,29 @@ export class LocalFileSystem extends FileSystem {
     if (source.targetKey === destination.targetKey) {
       throw new FsError(`cannot move "${source.displayPath}" to itself`, 'FS_SAME_TARGET')
     }
-    return this.withLocks([source.targetKey, destination.targetKey], async () => {
+    return this.withMutation([source, destination], async (prepared) => {
+      const source = prepared[0]
+      const destination = prepared[1]
+      const authorities = [signal, source.authoritySignal, destination.authoritySignal].filter(value => value !== undefined)
+      signal = authorities.length === 0 ? undefined : AbortSignal.any(authorities)
       const sourceInfo = await this.requireFile(source, options.expectedSource, 'move')
       const existing = await this.writeTarget(destination, options.expectedDestination)
-      const original = await readForEdit(source.targetKey, source.displayPath, signal)
+      const original = await readForEdit(source.targetKey, source.displayPath, signal, source.noFollow)
       const after = options.hunks === undefined ? original.content : this.patchContent(source, original.content, options.hunks)
       const content = restoreLineEndings(after, original.lineEndings)
       const before = existing && Buffer.byteLength(content, 'utf8') < this.config.diffBasisMaxBytes
-        ? await readTextForDiff(destination.targetKey, this.config.diffBasisMaxBytes, signal) : null
+        ? await readTextForDiff(destination.targetKey, this.config.diffBasisMaxBytes, signal, destination.noFollow) : null
       await this.internals.inspectBeforeMutation?.(source)
       if (signal?.aborted) throw new FsError('move aborted', 'FS_ABORTED')
       // After this checkpoint, complete both effects and report them even if cancellation arrives.
       await writeFileAtomic(destination.targetKey, content, sourceInfo.mode, undefined, this.internals, {
-        displayPath: destination.displayPath,
+        displayPath: destination.displayPath, noFollow: destination.noFollow,
         createIfAbsent: options.expectedDestination?.kind === 'createIfAbsent',
         existingDestination: existing !== null,
       })
       const outcome: FsWriteOutcome = {
         operation: existing ? 'update' : 'create',
-        version: this.versionAfterWrite(await probe(destination.targetKey), destination), before, after,
+        version: this.versionAfterWrite(await probe(destination.targetKey, destination.noFollow), destination), before, after,
       }
       const sourceBefore = Buffer.byteLength(original.content, 'utf8') < this.config.diffBasisMaxBytes ? original.content : null
       try {
@@ -343,11 +398,11 @@ export class LocalFileSystem extends FileSystem {
         return { sourceBefore, destination: outcome, sourceDeleted: false, sourceFailure: { code: error.code, message: error.message } }
       }
       return { sourceBefore, destination: outcome, sourceDeleted: true }
-    })
+    }, [destination])
   }
 
-  private async writeTarget(target: FsTarget, expected?: FsWriteIntent): Promise<PathInfo | null> {
-    const existing = await probe(target.targetKey)
+  private async writeTarget(target: LocalMutationTarget, expected?: FsWriteIntent): Promise<PathInfo | null> {
+    const existing = await probe(target.targetKey, target.noFollow)
     if (existing && existing.type !== 'file') {
       throw new FsError(`cannot write "${target.displayPath}": not a regular file`, 'FS_NOT_REGULAR_FILE')
     }
@@ -367,8 +422,8 @@ export class LocalFileSystem extends FileSystem {
     return existing
   }
 
-  private async requireFile(target: FsTarget, expected: { version: FsVersion } | undefined, verb: string): Promise<PathInfo> {
-    const existing = await probe(target.targetKey)
+  private async requireFile(target: LocalMutationTarget, expected: { version: FsVersion } | undefined, verb: string): Promise<PathInfo> {
+    const existing = await probe(target.targetKey, target.noFollow)
     if (!existing) throw new FsError(`cannot ${verb} "${target.displayPath}": file changed since it was read`, 'FS_STALE_VERSION')
     if (existing.type !== 'file') throw new FsError(`cannot ${verb} "${target.displayPath}": not a regular file`, 'FS_NOT_REGULAR_FILE')
     if (expected && existing.version !== expected.version) {

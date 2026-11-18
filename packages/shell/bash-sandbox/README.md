@@ -71,6 +71,14 @@ If no runner can enforce a confined mode, the foreground call fails with `SANDBO
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+### Host-provided access
+
+Resolved read grants are checked both before execution and after confinement preparation; an expired grant cannot start a command.
+
+In-flight commands and search processes lease their read authority until settlement. An authority generation change cancels those processes; settled listeners are released. Calls without read grants keep their original cancellation signal.
+
+Trusted service outputs may add exact physical file grants within the current authority generation. These grants record device and inode, expose no parent directory, and disappear when the generation changes. File reads and process mounts reject replacement inodes; this is a Host/service API, never a model-supplied permission request.
+
 This section explains the design of the executor and points at the code that realizes it; the observable behavior is fully covered in [Use this package](#use-this-package).
 
 ### Design concept

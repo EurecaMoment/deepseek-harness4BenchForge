@@ -3,8 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/fs/fs/README.md
 /:
-  en: a94eb1470c498a2c
-  zh: cdd5faa0a8fcb562
+  en: cb3f91d54eee30e5
+  zh: cb3f91d54eee30e5
+/description-the-ctx-fs-filesystem-service-contract-for-deployments-choosing-or-mounting-a-filesystem-backend-and-developers-implementing-one-kind-package-reference:
+  en: f30887e233206946
+  zh: 7ed8f0fac2a178df
 /deepseek-ai-dsh-fs:
   en: c4c564fe43efe006
   zh: 736312b9959f58bc
@@ -12,8 +15,8 @@
   en: ac24e6ad53b50d3f
   zh: b2489c715e5cf711
 /deepseek-ai-dsh-fs/table-of-contents:
-  en: d152484eb41ac6b4
-  zh: 09388d293f9be9cb
+  en: eb6ed279e78f8b65
+  zh: 5583226de8ecca29
 /deepseek-ai-dsh-fs/use-this-package:
   en: 130aa12ccf7a1752
   zh: 22d69bb7b5793fc9
@@ -24,26 +27,29 @@
   en: 5781e5a173192374
   zh: a3fa379ea951921d
 /deepseek-ai-dsh-fs/understand-the-implementation:
-  en: 7e13d669ecc96d59
-  zh: b5fe7ae65812d926
+  en: 57e15589824b2668
+  zh: 95f76747d673491d
+/deepseek-ai-dsh-fs/understand-the-implementation/host-provided-access:
+  en: bb0ef0a022a85f62
+  zh: 65e90e9eed426451
 /deepseek-ai-dsh-fs/understand-the-implementation/design-philosophy:
-  en: 955232f787df6d64
-  zh: ab572b040ab3554e
+  en: 30cf657a01c65380
+  zh: 365aafbaa458880a
 /deepseek-ai-dsh-fs/understand-the-implementation/source-map:
-  en: 8ab63fdfa9f95759
-  zh: bb88918900d7458b
+  en: c4054b6676c1e9ac
+  zh: de11e94d213564b2
 /deepseek-ai-dsh-fs/understand-the-implementation/how-a-call-flows:
   en: 3cefede64907731c
   zh: 529ef3851c2fb5c1
 /deepseek-ai-dsh-fs/understand-the-implementation/the-fs-policy-events:
-  en: 9addf6fbfab04db1
-  zh: b29942be20c13558
+  en: 9d6198ce60b05c18
+  zh: 7b4b0db666079d48
 /deepseek-ai-dsh-fs/understand-the-implementation/invariants:
-  en: 15b98bc9800b6eae
-  zh: 434d9dd05fa1a332
+  en: 67489255e68b67b4
+  zh: 1ec3273f3bd00deb
 /deepseek-ai-dsh-fs/further-exploration:
-  en: faca30b042b7f72d
-  zh: e436ca4c5bbfd3e4
+  en: 42f0aac8c54d52cb
+  zh: 92eb391e92b05fd0
 /deepseek-ai-dsh-fs/model-experience:
   en: 8ef3a43a11a7e187
   zh: 0fee346e68f6e2ac
@@ -51,8 +57,8 @@
   en: 40294c1c31b74824
   zh: 0857e9b4dd363e0a
 /deepseek-ai-dsh-fs/known-limitations-and-deferred-work:
-  en: 3e0736adfd6f54a5
-  zh: 6b043891432eed82
+  en: 7813e13917e82043
+  zh: 91d1a78f70e9d992
 /deepseek-ai-dsh-fs/known-limitations-and-deferred-work/dev-note:
-  en: e67f633dc6fe7773
-  zh: 3bb0c20c93f16f98
+  en: 34651d247c0d1bba
+  zh: b8b78bf26d28e4d6

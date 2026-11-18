@@ -14,6 +14,7 @@ import LlmRuntime, { createUserMessage, type ToolCallId, type Message, type Mess
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 import SessionStore, { type SessionId, SessionSeq, type SessionEvent, type SurfaceIntent, type UserMessage } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
+import SandboxPolicyService from '@deepseek-ai/dsh-sandbox-policy'
 import AgentRegistry, { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { FileSystem, type FsTargetKey, type FsVersion } from '@deepseek-ai/dsh-fs'
@@ -1876,6 +1877,26 @@ describe('workspace context request injection', () => {
       expectNoDerivedMessages(agent)
     } finally {
       await ctx.fiber.dispose()
+    }
+  })
+
+  it('does not read workspace instructions when the host supplies explicit read authority', async () => {
+    const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
+    const root = await tempRepo()
+    try {
+      await write(join(root, 'AGENTS.md'), 'Do not load this workspace data as instructions')
+      await mountAgentInstructions(ctx, { maxBytes: 65536 })
+      await ctx.plugin(SandboxPolicyService, { mode: 'workspace-write' })
+      const agent = await stubAgent(root)
+      ctx.sandboxPolicy.registerReadAccess(agent.session, { policyId: 'isolated', epoch: 1, roots: [root] })
+      const read = vi.spyOn(ctx.fs, 'readText')
+      await composeBaselinePrefix(ctx, agent)
+      expect(read).not.toHaveBeenCalled()
+      expectNoDerivedMessages(agent)
+    } finally {
+      await ctx.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
     }
   })
 

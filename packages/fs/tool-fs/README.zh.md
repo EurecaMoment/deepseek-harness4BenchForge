@@ -95,6 +95,10 @@ kind: "package-reference"
 <details>
 <summary>实现细节——点击展开</summary>
 
+### Host 提供的访问权限
+
+Agent 文件调用将解析后的[读取授权](../../sandbox/sandbox-policy/README.zh.md)传入文件对象解析。
+
 本节解释工具套件背后的设计决策，并指出实现它们的代码位置；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
 ### 设计理念

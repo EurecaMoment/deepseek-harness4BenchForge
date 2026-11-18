@@ -3,8 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/document/tool-office/README.md
 /:
-  en: 2ec7e66cd18356df
-  zh: 4862555b5a4c9f51
+  en: cb3f91d54eee30e5
+  zh: cb3f91d54eee30e5
+/description-skill-activated-office-tools-for-viewing-document-pages-converting-documents-and-recalculating-workbooks-kind-package-reference:
+  en: 8fef54f9f6ddd9c4
+  zh: 48c556706d327224
 /deepseek-ai-dsh-tool-office:
   en: e9153903d819e2a7
   zh: 3f50cf3c768a1af5
@@ -12,17 +15,20 @@
   en: e74f50cd7e13fad9
   zh: f234831ae934f60a
 /deepseek-ai-dsh-tool-office/table-of-contents:
-  en: d152484eb41ac6b4
-  zh: 09388d293f9be9cb
+  en: eb6ed279e78f8b65
+  zh: 5583226de8ecca29
 /deepseek-ai-dsh-tool-office/use-this-package:
-  en: 8e43235b282387a3
-  zh: 9823ab293840422a
+  en: a031b9b7b3ee3d8a
+  zh: 57bf7bae5a9fb367
 /deepseek-ai-dsh-tool-office/understand-the-implementation:
-  en: 05a32b4fde4d8c21
-  zh: f6ce05a11f5ccb6d
+  en: 57e15589824b2668
+  zh: 95f76747d673491d
+/deepseek-ai-dsh-tool-office/understand-the-implementation/host-provided-access:
+  en: e4d7909cd1c15b0a
+  zh: 791f4c371fbbe309
 /deepseek-ai-dsh-tool-office/further-exploration:
-  en: 5d20d2318d1957cf
-  zh: 8b8111099ab8bb46
+  en: 1f7968eeeaaa5c52
+  zh: 6a1ba22dbb5eedb0
 /deepseek-ai-dsh-tool-office/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -39,8 +45,8 @@
   en: c4e3595dab58a800
   zh: 65f7fcf46b1e3130
 /deepseek-ai-dsh-tool-office/known-limitations-and-deferred-work:
-  en: 41e64b075cac6b5d
-  zh: 56594dc602b63ca8
+  en: 78ec154d210522d1
+  zh: cc8d85672dcb5d86
 /deepseek-ai-dsh-tool-office/known-limitations-and-deferred-work/dev-note:
-  en: e67f633dc6fe7773
-  zh: e88aeb617ffb74ea
+  en: 34651d247c0d1bba
+  zh: 86522cb525d85ef7

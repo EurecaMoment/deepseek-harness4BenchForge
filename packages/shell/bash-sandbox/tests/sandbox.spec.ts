@@ -12,6 +12,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import type { CollectedOutput, ShellExecSpec, ShellExecution, ShellRunResult } from '@deepseek-ai/dsh-shell'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
+import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import { SANDBOX_UNAVAILABLE, SandboxProvider, SandboxUnavailableError } from '@deepseek-ai/dsh-sandbox'
 import type { ConfinedArgv, SandboxExecutionPolicy, SandboxMode, SandboxPolicy } from '@deepseek-ai/dsh-sandbox'
 import { SandboxPolicyService } from '@deepseek-ai/dsh-sandbox-policy'
@@ -103,6 +104,39 @@ function executionPolicy(mode: SandboxMode, workspaceRoot = resolve(process.cwd(
 }
 
 describe('the provider hand-off', () => {
+  it('registers only its own full-output file and still settles after authority revocation', async () => {
+    const { ctx, bash } = await setup({ mode: 'workspace-write' })
+    const session = Session.create(SessionId('shell-output'))
+    ctx.sandboxPolicy.registerReadAccess(session, { policyId: 'shell', epoch: 1, roots: [process.cwd()] })
+    const policy = ctx.sandboxPolicy.resolve({ session })
+    try {
+      const execution = await bash.execute(bash.resolve({ command: "printf '0123456789'", stdoutMaxBytes: 2, sandboxPolicy: policy }))
+      const result = await execution.result()
+      expect(result.stdout.spillPath).toBeDefined()
+      expect(ctx.sandboxPolicy.resolve({ session }).readAccess?.artifacts?.map(file => file.path)).toEqual([result.stdout.spillPath])
+      const pending = await bash.execute(bash.resolve({ command: 'sleep 30', onExpiry: 'none', sandboxPolicy: policy }))
+      ctx.sandboxPolicy.registerReadAccess(session, { policyId: 'shell', epoch: 2, roots: [] })
+      await expect(pending.done).resolves.toBeUndefined()
+      await expect(pending.result()).rejects.toThrow('expired')
+      expect(() => pending.observed.stdout.readFrom(0)).toThrow('expired')
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('keeps authority cancellation attached until a running shell settles', async () => {
+    const { ctx, bash } = await setup({ mode: 'workspace-write' })
+    const revoked = new AbortController()
+    const dispose = vi.fn()
+    vi.spyOn(ctx.sandboxPolicy, 'leaseReadAccess').mockReturnValue({ signal: revoked.signal, dispose })
+    try {
+      const execution = await bash.execute(bash.resolve({ command: 'sleep 30', onExpiry: 'none' }))
+      expect(dispose).not.toHaveBeenCalled()
+      revoked.abort(new Error('read authority revoked'))
+      await execution.done
+      expect(await execution.result()).toMatchObject({ aborted: true })
+      expect(dispose).toHaveBeenCalledOnce()
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it('reports caller cancellation when a failed launch result is read after abort', async () => {
     const { ctx, bash } = await setup({}, () => passthrough(['node']))
     const controller = new AbortController()

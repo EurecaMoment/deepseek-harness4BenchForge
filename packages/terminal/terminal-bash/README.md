@@ -81,6 +81,10 @@ An open returns the session id and a bounded startup message. Sends settle with 
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+### Host-provided access
+
+Explicit read isolation preserves the controlled Bash prompt inside the confined process and rechecks authority before spawning.
+
 This section explains the design behind the backend and points at the code that realizes it; the observable behavior is covered in [Use this package](#use-this-package).
 
 ### Design concept

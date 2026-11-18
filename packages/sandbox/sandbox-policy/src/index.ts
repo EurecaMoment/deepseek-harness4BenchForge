@@ -23,13 +23,14 @@
  */
 
 import { isAbsolute } from 'node:path'
+import { lstatSync, realpathSync } from 'node:fs'
 import { Context, Service } from '@deepseek-ai/cordis'
 import { z as zod } from 'zod'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-agent'
-import { SandboxInvalidRootError } from '@deepseek-ai/dsh-sandbox'
-import type { SandboxExecutionPolicy, SandboxMode } from '@deepseek-ai/dsh-sandbox'
-import type { Session } from '@deepseek-ai/dsh-session'
+import { SandboxInvalidRootError, SandboxReadAccessError } from '@deepseek-ai/dsh-sandbox'
+import type { SandboxExecutionPolicy, SandboxMode, SandboxReadAccess, SandboxReadArtifact } from '@deepseek-ai/dsh-sandbox'
+import type { Session, SessionId } from '@deepseek-ai/dsh-session'
 import type { ProjectionHandle } from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 
@@ -83,6 +84,22 @@ declare module '@deepseek-ai/cordis' {
   interface Context {
     sandboxPolicy: SandboxPolicyService
   }
+  interface Events {
+    /**
+     * Announce a proposed authority change before committing it.
+     * @mode emit
+     * @param session - authority owner.
+     * @param access - proposed read grants.
+     */
+    'sandbox/read-access-changing'(session: Session, access: SandboxReadAccess): void
+    /**
+     * Revoke stale in-flight operations after committing new authority.
+     * @mode emit
+     * @param session - authority owner.
+     * @param access - committed read grants.
+     */
+    'sandbox/read-access-changed'(session: Session, access: SandboxReadAccess): void
+  }
 }
 
 /**
@@ -114,7 +131,7 @@ export interface Config {
 /** Inputs that select the sandbox policy for one capability call. */
 export interface SandboxPolicyRequest {
   /** Calling session; its immutable cwd becomes the workspace boundary. */
-  session?: Session
+  session?: Session | undefined
   /** Explicit approved mode override, which outranks session policy. */
   mode?: SandboxMode
 }
@@ -152,6 +169,9 @@ export class SandboxPolicyService extends Service {
   readonly additionalWritableRoots: readonly string[] | undefined
   /** Independently owned grants for each live Session; never restored from its log. */
   private readonly writableRootRegistrations = new WeakMap<Session, Map<symbol, string>>()
+  private readonly readAccessRegistrations = new WeakMap<Session, SandboxReadAccess>()
+  private readonly readAccessBySession = new Map<SessionId, SandboxReadAccess>()
+  private readonly readArtifacts = new Map<SessionId, Map<string, SandboxReadArtifact>>()
   private sandboxModeProjectionHandle!: ProjectionHandle<SandboxMode | null>
 
   constructor(ctx: Context, config: Config) {
@@ -211,12 +231,108 @@ export class SandboxPolicyService extends Service {
     const additionalWritableRoots = registrations === undefined
       ? this.additionalWritableRoots
       : resolveAdditionalWritableRoots([...(this.additionalWritableRoots ?? []), ...registrations.values()])
+    const registered = session === undefined ? undefined : this.readAccessBySession.get(session.id)
+    const artifacts = session === undefined ? undefined : this.readArtifacts.get(session.id)
+    const readAccess = registered === undefined ? undefined : artifacts?.size
+      ? Object.freeze({ ...registered, artifacts: Object.freeze([...(registered.artifacts ?? []), ...artifacts.values()]) }) : registered
     return {
       mode: request.mode ?? (session === undefined ? undefined : this.overrideOf(session)) ?? this.defaultMode,
       workspaceRoot: this.sessionWorkspaceRoot(session),
       ...additionalWritableRoots === undefined ? {} : { additionalWritableRoots },
       ...session === undefined ? {} : { sessionId: session.id },
+      ...readAccess === undefined ? {} : { readAccess },
     }
+  }
+
+  /**
+   * Register read roots; disposal retains a deny-all generation until reauthorized.
+   * @param session - exact Session whose future operations receive these grants.
+   * @param access - trusted identity, monotonically increasing generation, and absolute roots.
+   * @returns the owning Cordis effect disposer; stale disposers do not revoke newer grants.
+   */
+  registerReadAccess(session: Session, access: SandboxReadAccess): () => void {
+    if (!access.policyId || !Number.isSafeInteger(access.epoch) || access.epoch < 0
+      || access.roots.some(root => !isExecutionWorldPath(root))) {
+      throw new SandboxReadAccessError('sandbox-policy: invalid read-access identity, epoch or absolute roots')
+    }
+    const previous = this.readAccessBySession.get(session.id)
+    if (previous && (previous.policyId !== access.policyId || access.epoch <= previous.epoch)) {
+      throw new SandboxReadAccessError('sandbox-policy: read-access updates require the same identity and a newer epoch')
+    }
+    const registered = Object.freeze({ policyId: access.policyId, epoch: access.epoch, roots: Object.freeze([...new Set(access.roots)]) })
+    this.ctx.emit('sandbox/read-access-changing', session, registered)
+    this.readAccessRegistrations.set(session, registered)
+    this.readAccessBySession.set(session.id, registered)
+    this.readArtifacts.delete(session.id)
+    this.ctx.emit('sandbox/read-access-changed', session, registered)
+    const dispose = this.ctx.effect(() => () => {
+      if (this.readAccessRegistrations.get(session) !== registered || this.readAccessBySession.get(session.id) !== registered) return
+      const revoked = Object.freeze({ ...registered, epoch: registered.epoch + 1, roots: Object.freeze([] as string[]) })
+      this.ctx.emit('sandbox/read-access-changing', session, revoked)
+      this.readAccessRegistrations.set(session, revoked)
+      this.readAccessBySession.set(session.id, revoked)
+      this.readArtifacts.delete(session.id)
+      this.ctx.emit('sandbox/read-access-changed', session, revoked)
+    }, 'sandboxPolicy.registerReadAccess()')
+    // oxlint-disable-next-line typescript/no-misused-promises -- preserve the exact synchronous effect disposer
+    return dispose
+  }
+
+  /**
+   * Refuse a target or process snapshot resolved before its authority changed.
+   * @param policy - resolved execution authority; unrestricted calls require no read registration.
+   */
+  assertReadAccess(policy: SandboxExecutionPolicy): void {
+    if (!policy.readAccess || policy.mode === 'danger-full-access') return
+    const current = policy.sessionId === undefined ? undefined : this.readAccessBySession.get(policy.sessionId)
+    if (policy.sessionId !== undefined && (current === undefined
+      || current.policyId !== policy.readAccess.policyId || current.epoch !== policy.readAccess.epoch)) {
+      throw new SandboxReadAccessError('sandbox-policy: read authority expired; resolve a fresh execution policy')
+    }
+  }
+
+  /**
+   * Cancel an in-flight operation when its registered read authority changes.
+   * @param policy - execution snapshot checked before the listener is installed.
+   * @param signal - optional caller cancellation, combined with revocation.
+   * @returns cancellation signal and a disposer to release when execution settles.
+   */
+  leaseReadAccess(policy: SandboxExecutionPolicy, signal?: AbortSignal): { signal: AbortSignal; dispose: () => void } {
+    this.assertReadAccess(policy)
+    const revoked = new AbortController()
+    const expected = policy.readAccess
+    if (expected === undefined || policy.mode === 'danger-full-access') return { signal: signal ?? revoked.signal, dispose: () => {} }
+    const dispose = this.ctx.on(
+      'sandbox/read-access-changed', (session, access) => {
+        if (session.id === policy.sessionId && (access.policyId !== expected.policyId || access.epoch !== expected.epoch)) {
+          revoked.abort(new SandboxReadAccessError('sandbox-policy: execution read authority was revoked'))
+        }
+      }, { global: true },
+    )
+    return { signal: signal === undefined ? revoked.signal : AbortSignal.any([signal, revoked.signal]), dispose: () => { dispose() } }
+  }
+
+  /**
+   * Grant one file produced by a trusted service under the current read generation.
+   * @param policy - owner snapshot captured before the service produced the file.
+   * @param path - service-owned physical output filename, never model-supplied input.
+   * @returns the physical path; future resolutions include only this file's inode.
+   */
+  registerReadArtifact(policy: SandboxExecutionPolicy, path: string): string {
+    this.assertReadAccess(policy)
+    if (policy.readAccess === undefined || policy.mode === 'danger-full-access') return path
+    if (policy.sessionId === undefined) throw new SandboxReadAccessError('sandbox-policy: artifact authority requires a Session owner')
+    const physical = realpathSync.native(path)
+    const info = lstatSync(path, { bigint: true })
+    if (physical !== path || !info.isFile()) throw new SandboxReadAccessError('sandbox-policy: output grants require a physical regular file')
+    const files = this.readArtifacts.get(policy.sessionId) ?? new Map<string, SandboxReadArtifact>()
+    const previous = files.get(path)
+    if (previous && (previous.device !== String(info.dev) || previous.inode !== String(info.ino))) {
+      throw new SandboxReadAccessError('sandbox-policy: trusted output file was replaced')
+    }
+    files.set(path, Object.freeze({ path, device: String(info.dev), inode: String(info.ino) }))
+    this.readArtifacts.set(policy.sessionId, files)
+    return physical
   }
 
   /** The session's recorded cwd, or the configured root, as the workspace-write boundary. */

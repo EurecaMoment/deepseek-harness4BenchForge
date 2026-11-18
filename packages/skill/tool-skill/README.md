@@ -68,6 +68,10 @@ Loading a listed skill returns its full instructions; the model sees one canonic
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+### Host-provided access
+
+Explicit read authority selects `trustedSourcesOnly` for model catalogs, tool loads, and user skill invocations.
+
 This section explains how the catalog and the invocation boundary are built; the observable behavior is fully covered in [Use this package](#use-this-package) and the Model Experience section below.
 
 ### Design concept

@@ -1242,11 +1242,11 @@
   en: a7b8c3f842059eec
   zh: 4b345faa13cc39f6
 /session-persistence-event-catalog/resolved-persistence-types/skillcatalogsource:
-  en: 615f4a7645b94dab
-  zh: 9e93a88507f2bca4
+  en: 932793022c9578d3
+  zh: 760ddee9dddeeb95
 /session-persistence-event-catalog/resolved-persistence-types/skillinvocationsource:
-  en: 29df35a8cc984e75
-  zh: 321b4e8bb0ad0850
+  en: 921082170bc64c65
+  zh: cbb1ad9a35a989cb
 /session-persistence-event-catalog/resolved-persistence-types/streamchunk:
   en: 747e384b3176e0cb
   zh: defbff408ea7c97c
@@ -1509,8 +1509,8 @@
   en: 10a2d594b106f6fe
   zh: 8408379e744ad987
 /session-persistence-event-catalog/resolved-persistence-types/description-name:
-  en: a09e74cd05d03b0e
-  zh: aa51b3c5db030513
+  en: b75eb8f2da00ad00
+  zh: e07dac896e778ade
 /session-persistence-event-catalog/resolved-persistence-types/description-name~2:
   en: a07969828eed2e6f
   zh: e06893743af544b5

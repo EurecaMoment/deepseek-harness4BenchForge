@@ -6,6 +6,7 @@ import { FsError } from '@deepseek-ai/dsh-fs'
 import { ToolArgsError, ToolContextUnavailableError, defineTool, type ToolExecution } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-agent'
 import type { Session } from '@deepseek-ai/dsh-session'
+import type {} from '@deepseek-ai/dsh-sandbox-policy'
 import type { PresentedFile } from './types.ts'
 
 /** Stable Loader identity. */
@@ -81,11 +82,12 @@ export function apply(ctx: Context, config: Config): void {
       if (boundary.openTurnStartSeq === null) throw new ToolContextUnavailableError('present requires an open turn')
       if (args.files.length === 0 || args.files.length > config.maxFiles) throw new ToolArgsError([`present accepts 1 to ${config.maxFiles} files`])
       const cwd = await ctx.workingDirectory.ensure(exec.agent, exec.signal)
-      const options = { cwd, signal: exec.signal }
+      const sandboxPolicy = ctx.get('sandboxPolicy')?.resolve({ session: exec.agent.session })
+      const options = { cwd, signal: exec.signal, ...sandboxPolicy === undefined ? {} : { sandboxPolicy } }
       const files: PresentedFile[] = []
       for (const file of args.files) {
         if (file.path.trim().length === 0) throw new ToolArgsError(['present requires a non-empty file path'])
-        const entry = await ctx.fs.lstat(file.path, { cwd }, exec.signal)
+        const entry = await ctx.fs.lstat(file.path, options, exec.signal)
         if (entry !== undefined && entry.type !== 'file') throw new FsError(`Cannot present ${file.path}: not a regular file`, 'FS_NOT_REGULAR_FILE')
         const target = await ctx.fs.resolve(file.path, options)
         const info = await ctx.fs.stat(target, exec.signal)

@@ -3,8 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/fs/tool-str-replace-editor/README.md
 /:
-  en: 1d308889b00602e0
-  zh: 8858e4768891e79d
+  en: cb3f91d54eee30e5
+  zh: cb3f91d54eee30e5
+/description-the-standalone-str-replace-editor-tool-over-ctx-fs-for-users-and-maintainers-composing-claude-code-style-file-editing-for-agents-kind-package-reference:
+  en: 298070ebc71ca812
+  zh: 4e649f2c674352fd
 /deepseek-ai-dsh-tool-str-replace-editor:
   en: ec475ff43043b97b
   zh: 8b517c5c11bd650f
@@ -12,8 +15,8 @@
   en: f7423308d3241a02
   zh: 84255466399391f2
 /deepseek-ai-dsh-tool-str-replace-editor/table-of-contents:
-  en: d152484eb41ac6b4
-  zh: 09388d293f9be9cb
+  en: eb6ed279e78f8b65
+  zh: 5583226de8ecca29
 /deepseek-ai-dsh-tool-str-replace-editor/use-this-package:
   en: 549d3ed126a46a99
   zh: 476e0f61fa5e9ecb
@@ -21,8 +24,8 @@
   en: db6e7d91ff7e0439
   zh: 2ed4096f6c856e17
 /deepseek-ai-dsh-tool-str-replace-editor/use-this-package/configuration:
-  en: e6860f1861cc0df8
-  zh: cd00d3c1a660b7c7
+  en: 5ccc117ce428c012
+  zh: 2dac71c27cc516f3
 /deepseek-ai-dsh-tool-str-replace-editor/use-this-package/the-commands:
   en: 554e8446946fbd96
   zh: 3af12627c19a0111
@@ -30,20 +33,23 @@
   en: 68d14f5993c734d5
   zh: 36eab11474947735
 /deepseek-ai-dsh-tool-str-replace-editor/understand-the-implementation:
-  en: b0b36a22cd4421eb
-  zh: db47ef5b71dd51df
+  en: 57e15589824b2668
+  zh: 95f76747d673491d
+/deepseek-ai-dsh-tool-str-replace-editor/understand-the-implementation/host-provided-access:
+  en: eb1f7e7a2aa3a138
+  zh: eb63115dabf86e29
 /deepseek-ai-dsh-tool-str-replace-editor/understand-the-implementation/design-concept:
   en: cce2bf460652cba4
   zh: 1f4f1c1563c4c55c
 /deepseek-ai-dsh-tool-str-replace-editor/understand-the-implementation/source-map:
-  en: 3f906cb8a23140e5
-  zh: 5d72b0f3244c29bc
+  en: c769cb743f78c13f
+  zh: fe0d542223379827
 /deepseek-ai-dsh-tool-str-replace-editor/understand-the-implementation/how-each-command-runs:
   en: a866aa948afff207
   zh: 65b0417597efc19c
 /deepseek-ai-dsh-tool-str-replace-editor/further-exploration:
-  en: b1c1ee3798694a4e
-  zh: 53b2033c94711c26
+  en: 208941db9981a444
+  zh: 127a3e2d4e054cda
 /deepseek-ai-dsh-tool-str-replace-editor/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -72,8 +78,8 @@
   en: ba6a48888c3361e5
   zh: 30244b70b2122bd6
 /deepseek-ai-dsh-tool-str-replace-editor/known-limitations-and-deferred-work:
-  en: bce77fc35b8a0140
-  zh: 48f227222bf5f3dc
+  en: 30a683d5832b8558
+  zh: 03d1621eaa44182d
 /deepseek-ai-dsh-tool-str-replace-editor/known-limitations-and-deferred-work/dev-note:
-  en: e67f633dc6fe7773
-  zh: 3bb0c20c93f16f98
+  en: 34651d247c0d1bba
+  zh: b8b78bf26d28e4d6

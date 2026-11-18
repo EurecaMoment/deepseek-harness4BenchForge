@@ -68,6 +68,10 @@ agent 可以在会话期间发现并加载 skill。当 `skill` 工具可见时�
 <details>
 <summary>实现细节——点击展开</summary>
 
+### Host 提供的访问权限
+
+显式读取授权使模型目录、工具加载和用户技能调用统一采用 `trustedSourcesOnly`。
+
 本节解释目录与调用边界如何构建；可观察行为已在[使用本包](#use-this-package)和下方模型体验章节中完整说明。
 
 ### 设计理念

@@ -83,6 +83,10 @@ export interface Config {
 <details>
 <summary>实现细节——点击展开</summary>
 
+### Host 提供的访问权限
+
+显式读取授权的会话不自动发现工作区或用户指令文件，由 Host 通过现有提示词组合提供认可的指令。
+
 本节解释插件背后的设计决策；可观察行为见[使用本包](#use-this-package)。
 
 ### 设计理念

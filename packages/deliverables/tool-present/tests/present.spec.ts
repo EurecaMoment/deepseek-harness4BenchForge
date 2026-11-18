@@ -9,6 +9,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
+import SandboxedFileSystem from '@deepseek-ai/dsh-fs-sandbox'
+import SandboxPolicy from '@deepseek-ai/dsh-sandbox-policy'
 import { createScope, type Scope } from '@deepseek-ai/dsh-scope'
 import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { SESSION_FORMAT_VERSION, Session, type SessionId } from '@deepseek-ai/dsh-session'
@@ -54,7 +56,7 @@ async function agent(ctx: Context, cwd: string | undefined): Promise<Agent> {
 }
 
 
-async function setup() {
+async function setup(restrictReads = false) {
   const root = await mkdtemp(join(tmpdir(), 'dsh-present-minimal-'))
   cleanups.push(() => rm(root, { recursive: true, force: true }))
   const ctx = new Context()
@@ -65,7 +67,12 @@ async function setup() {
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(AgentRegistry)
-  await ctx.plugin(LocalFileSystem, { cwd: root })
+  if (restrictReads) {
+    await ctx.plugin(SandboxPolicy, { mode: 'workspace-write', workspaceRoot: root })
+    await ctx.plugin(SandboxedFileSystem, { cwd: root })
+  } else {
+    await ctx.plugin(LocalFileSystem, { cwd: root })
+  }
   const fiber = ctx.plugin(Present, { maxFiles: 2 })
   await fiber
   const owner = await agent(ctx, root)
@@ -78,6 +85,15 @@ async function setup() {
 }
 
 describe('present', () => {
+  it('refuses unauthorized deliveries before recording their paths', async () => {
+    const { ctx, owner, root, execute } = await setup(true)
+    await writeFile(join(root, 'private.txt'), 'private')
+    ctx.sandboxPolicy.registerReadAccess(owner.session, { roots: [], policyId: 'present', epoch: 1 })
+    const result = await execute([{ path: 'private.txt' }])
+    expect(result.error).toMatchObject({ info: { code: 'FS_SANDBOX_DENIED' } })
+    expect(owner.session.snapshotEvents().some(event => event.type === 'deliverables/presented')).toBe(false)
+  })
+
   it('declares binary files without reading or copying contents, and records one delivery', async () => {
     const { ctx, owner, root, execute, fiber } = await setup()
     const data = Uint8Array.of(80, 75, 0, 255)

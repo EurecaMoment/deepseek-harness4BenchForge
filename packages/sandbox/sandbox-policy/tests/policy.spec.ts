@@ -44,6 +44,51 @@ async function policyContext(ctx: Context, activeSession: Session): Promise<stri
 }
 
 describe('SandboxPolicyService', () => {
+  it('cancels leased execution on authority changes and releases settled listeners', async () => {
+    const ctx = await mounted({ mode: 'workspace-write' })
+    const active = session('leased'), other = session('other')
+    ctx.sandboxPolicy.registerReadAccess(active, { policyId: 'lease', epoch: 1, roots: ['/workspace/a'] })
+    const policy = ctx.sandboxPolicy.resolve({ session: active })
+    const leased = ctx.sandboxPolicy.leaseReadAccess(policy)
+    const settled = ctx.sandboxPolicy.leaseReadAccess(policy)
+    settled.dispose()
+    ctx.sandboxPolicy.registerReadAccess(other, { policyId: 'other', epoch: 1, roots: ['/workspace/b'] })
+    expect(leased.signal.aborted).toBe(false)
+    ctx.sandboxPolicy.registerReadAccess(active, { policyId: 'lease', epoch: 2, roots: [] })
+    expect(leased.signal.aborted).toBe(true)
+    expect(leased.signal.reason).toMatchObject({ code: 'SANDBOX_READ_ACCESS_DENIED' })
+    expect(settled.signal.aborted).toBe(false)
+    leased.dispose()
+    await ctx.fiber.dispose()
+  })
+
+  it('revokes retained snapshots without restoring unrestricted access and permits a newer generation', async () => {
+    const ctx = await mounted({ mode: 'workspace-write' })
+    const active = session('read-grants')
+    const remove = ctx.sandboxPolicy.registerReadAccess(active, { policyId: 'a', epoch: 1, roots: ['/workspace/a'] })
+    const first = ctx.sandboxPolicy.resolve({ session: active })
+    expect(() => { ctx.sandboxPolicy.assertReadAccess(first) }).not.toThrow()
+    remove()
+    expect(ctx.sandboxPolicy.resolve({ session: active }).readAccess).toEqual({ policyId: 'a', epoch: 2, roots: [] })
+    expect(() => { ctx.sandboxPolicy.assertReadAccess(first) }).toThrow('expired')
+    expect(() => ctx.sandboxPolicy.registerReadAccess(active, { policyId: 'a', epoch: 1, roots: ['/workspace/a'] })).toThrow('newer epoch')
+    ctx.sandboxPolicy.registerReadAccess(active, { policyId: 'a', epoch: 3, roots: ['/workspace/a'] })
+    remove()
+    expect(ctx.sandboxPolicy.resolve({ session: active }).readAccess?.epoch).toBe(3)
+    await ctx.fiber.dispose()
+  })
+
+  it('keeps independent sessions isolated and rejects stale same-id replacements', async () => {
+    const ctx = await mounted()
+    const a = session('a'), b = session('b')
+    ctx.sandboxPolicy.registerReadAccess(a, { policyId: 'a', epoch: 1, roots: ['/a'] })
+    ctx.sandboxPolicy.registerReadAccess(b, { policyId: 'b', epoch: 1, roots: ['/b'] })
+    expect(ctx.sandboxPolicy.resolve({ session: a }).readAccess?.roots).toEqual(['/a'])
+    expect(ctx.sandboxPolicy.resolve({ session: b }).readAccess?.roots).toEqual(['/b'])
+    expect(() => ctx.sandboxPolicy.registerReadAccess(session('a'), { policyId: 'a', epoch: 1, roots: ['/a'] })).toThrow('newer epoch')
+    await ctx.fiber.dispose()
+  })
+
   it('defaults to read-only under the process cwd', async () => {
     const ctx = await mounted()
     expect(ctx.sandboxPolicy.defaultMode).toBe('read-only')

@@ -3,8 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/sandbox/sandbox/README.md
 /:
-  en: 4308065a46738364
-  zh: 2eb6ab7314e74976
+  en: cb3f91d54eee30e5
+  zh: cb3f91d54eee30e5
+/description-the-process-sandbox-service-contract-for-users-and-maintainers-composing-using-or-extending-same-world-subprocess-confinement-kind-package-reference:
+  en: fb140adbbc2941d5
+  zh: 593674cf5fde9f16
 /deepseek-ai-dsh-sandbox:
   en: 3d3312b2261f0a60
   zh: 47741e2a3d90da70
@@ -12,8 +15,8 @@
   en: be0473ca1d2dbb6c
   zh: 8c6b097438d2c2af
 /deepseek-ai-dsh-sandbox/table-of-contents:
-  en: d152484eb41ac6b4
-  zh: 09388d293f9be9cb
+  en: eb6ed279e78f8b65
+  zh: 5583226de8ecca29
 /deepseek-ai-dsh-sandbox/use-this-package:
   en: 5fbf0b48effb1143
   zh: 5c570dcc1a17e0ad
@@ -24,8 +27,8 @@
   en: c5540889017b6a7f
   zh: 679bfbd5254bf92d
 /deepseek-ai-dsh-sandbox/use-this-package/modes-and-enforcement:
-  en: d3c906ddb4c47cbc
-  zh: d264b9103e3566d6
+  en: 09f836b007b11c89
+  zh: 2236c48a1ed6c29c
 /deepseek-ai-dsh-sandbox/use-this-package/denied-calls-and-escalation:
   en: a0d3b28a785797fa
   zh: b45bd41a97d51b0a
@@ -33,14 +36,17 @@
   en: b3d36b28566cadd4
   zh: 22cf905bf574865a
 /deepseek-ai-dsh-sandbox/understand-the-implementation:
-  en: 7e13d669ecc96d59
-  zh: b5fe7ae65812d926
+  en: 57e15589824b2668
+  zh: 95f76747d673491d
+/deepseek-ai-dsh-sandbox/understand-the-implementation/host-provided-access:
+  en: 6d85f1b0fe92998b
+  zh: 631f349b1cbb9862
 /deepseek-ai-dsh-sandbox/understand-the-implementation/design-philosophy:
-  en: 0fc96495c192b513
-  zh: 38b51b9b3c208012
+  en: 555cb648c968a9a5
+  zh: 527099fc693fe019
 /deepseek-ai-dsh-sandbox/understand-the-implementation/source-map:
-  en: fd0d9eb8c4d027ff
-  zh: c6a43210dac01447
+  en: 5c5a30b1c1cc2838
+  zh: 6cedac9ec18062c7
 /deepseek-ai-dsh-sandbox/understand-the-implementation/escalation-choreography:
   en: 1b418d41f571ab3d
   zh: 62b289cdd6f4d272
@@ -48,8 +54,8 @@
   en: 6be9f7d4c65761d6
   zh: f00d9970ed58e3e0
 /deepseek-ai-dsh-sandbox/further-exploration:
-  en: 33d09277fb15d59f
-  zh: 920ffe66671b56f3
+  en: ca18b14b537d7205
+  zh: 90db4f51ea494e74
 /deepseek-ai-dsh-sandbox/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -81,11 +87,11 @@
   en: ea21ed3a768ed4b8
   zh: 8e2f396a6875420e
 /deepseek-ai-dsh-sandbox/known-limitations-and-deferred-work:
-  en: 63ff67b6fd13b4b0
-  zh: 6c8efa9ee99ea9bf
+  en: 6fa50e760813add2
+  zh: dc466364f7b6e861
 /deepseek-ai-dsh-sandbox/known-limitations-and-deferred-work/dev-note:
-  en: cc273320f6a1beaf
-  zh: 5c57a312ddc50651
+  en: 3a45fc1d6d88d87c
+  zh: b6e668ab99c05bab
 /deepseek-ai-dsh-sandbox/known-limitations-and-deferred-work/dev-note/future-consumers-and-environments:
   en: f5fb77e6f7fd03ed
   zh: fc4e28f6c04198ea

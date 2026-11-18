@@ -89,6 +89,10 @@ Every `SubagentError` carries one code from the closed `SubagentErrorCode` union
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+### Host-provided access
+
+Initial effective cwd follows a directory replaced by the `agent/create` hook; without such a replacement the requested child cwd keeps its existing meaning.
+
 This section explains how the service is built and where the observable behavior comes from; the full contract lives in [Use this package](#use-this-package).
 
 ### Design concept

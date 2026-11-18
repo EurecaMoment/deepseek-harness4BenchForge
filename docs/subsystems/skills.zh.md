@@ -194,6 +194,8 @@ skill 查找对 cwd 敏感，因为提供方可能暴露工作区本地的 skill
 ```ts type-equiv
 /** Caller context used for cwd-sensitive and abortable provider work. */
 interface SkillLookupOptions {
+  /** Restrict automatic filesystem discovery to explicitly configured and bundled sources; omission includes defaults. */
+  readonly trustedSourcesOnly?: boolean | undefined
   /** Workspace selector for the current lookup. */
   readonly cwd?: string | undefined
   /** Abort discovery or loading work for the current caller. */

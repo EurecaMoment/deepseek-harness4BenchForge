@@ -5,6 +5,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { PtcRuntimeError, type PtcProgramFormat, type PtcRunRequest, type PtcRunResult, type PtcRunSpec } from '@deepseek-ai/dsh-ptc-runtime'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
 import { clampTimeout } from '@deepseek-ai/dsh-timeout'
+import { sandboxPolicyKey } from '@deepseek-ai/dsh-sandbox'
 import type { ResolvedConfig } from './config.ts'
 import { validateBindings } from './bindings.ts'
 import type { PolicyProcesses } from './policy-processes.ts'
@@ -90,7 +91,9 @@ class NodeExecution {
     const owner = this.mode.retainsState ? spec.stateOwner : undefined
     let worker = owner === undefined ? undefined : this.owners.get(owner)
     worker?.assertIdle()
-    if (worker && !worker.closed && (worker.policy.mode !== spec.sandboxPolicy.mode
+    if (worker && !worker.closed && ((spec.sandboxPolicy.readAccess !== undefined
+      && sandboxPolicyKey(worker.policy) !== sandboxPolicyKey(spec.sandboxPolicy))
+      || worker.policy.mode !== spec.sandboxPolicy.mode
       || worker.policy.workspaceRoot !== spec.sandboxPolicy.workspaceRoot
       || worker.policy.sessionId !== spec.sandboxPolicy.sessionId)) {
       throw new PtcRuntimeError('persistent PTC: release the retained environment before changing its sandbox policy', 'PTC_RUNTIME_CONFLICT')
@@ -104,6 +107,9 @@ class NodeExecution {
         ...spec.sandboxPolicy.additionalWritableRoots === undefined
           ? {}
           : { additionalWritableRoots: [...spec.sandboxPolicy.additionalWritableRoots] },
+        ...spec.sandboxPolicy.readAccess === undefined ? {} : {
+          readAccess: { ...spec.sandboxPolicy.readAccess, roots: [...spec.sandboxPolicy.readAccess.roots] },
+        },
       }, this.processes, this.mode, owner !== undefined, initialization)
       this.workers.add(worker)
       if (owner !== undefined) this.owners.set(owner, worker)

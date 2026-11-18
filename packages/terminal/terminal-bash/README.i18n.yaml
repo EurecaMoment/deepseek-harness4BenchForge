@@ -3,8 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/terminal/terminal-bash/README.md
 /:
-  en: 7451cb97579aa088
-  zh: 836bff293fae7bd3
+  en: cb3f91d54eee30e5
+  zh: cb3f91d54eee30e5
+/description-the-shipped-shell-backend-for-persistent-terminal-sessions-interactive-bash-or-pwsh-under-the-shared-sandbox-policy-with-readiness-detection-and-bounded-line-oriented-output-kind-package-reference:
+  en: 55c37b45b520f010
+  zh: eea28df011bf9bf8
 /deepseek-ai-dsh-terminal-bash:
   en: 70eb464a6754f633
   zh: f7ad67d8a9eb7195
@@ -12,8 +15,8 @@
   en: b50ba02f6602a1fd
   zh: 1c954a0e0999280d
 /deepseek-ai-dsh-terminal-bash/table-of-contents:
-  en: d152484eb41ac6b4
-  zh: 09388d293f9be9cb
+  en: eb6ed279e78f8b65
+  zh: 5583226de8ecca29
 /deepseek-ai-dsh-terminal-bash/use-this-package:
   en: d8e828f8e99fe4f1
   zh: 75c5823fe6364a11
@@ -24,8 +27,8 @@
   en: 71449ef1985b2f1b
   zh: 562e9b5ef73cd5e1
 /deepseek-ai-dsh-terminal-bash/use-this-package/configuration:
-  en: 2a10fc681cee698d
-  zh: ac60c8918bae3c85
+  en: 42a6ed6649e547aa
+  zh: 44d8b9c8a6b3c0da
 /deepseek-ai-dsh-terminal-bash/use-this-package/shell-dialects-and-readiness:
   en: 2cab01d85f524e3d
   zh: 0d00b3e399a935b1
@@ -36,14 +39,17 @@
   en: 71726aa75e303acd
   zh: 4dc311eeed75fa09
 /deepseek-ai-dsh-terminal-bash/understand-the-implementation:
-  en: 97f4f07114f5a995
-  zh: d30b07058a3103c7
+  en: 57e15589824b2668
+  zh: 95f76747d673491d
+/deepseek-ai-dsh-terminal-bash/understand-the-implementation/host-provided-access:
+  en: e3ef2514bb272d2b
+  zh: c3c4f42df679a173
 /deepseek-ai-dsh-terminal-bash/understand-the-implementation/design-concept:
   en: 1801aaa763743049
   zh: b8c8158a63ed6055
 /deepseek-ai-dsh-terminal-bash/understand-the-implementation/source-map:
-  en: 9a525f7a7228a09b
-  zh: d57537edfacc9f8b
+  en: 39a2be7f8e77c267
+  zh: 92ac6ec25501d12f
 /deepseek-ai-dsh-terminal-bash/understand-the-implementation/readiness-model:
   en: a768d621c2ea2585
   zh: 8213317da48766e3
@@ -54,8 +60,8 @@
   en: a88b693ec539ac28
   zh: a309bbe671166027
 /deepseek-ai-dsh-terminal-bash/further-exploration:
-  en: 0c44b6dab2f819b7
-  zh: bdd3da50d9180977
+  en: d75891582a8f104f
+  zh: 9cf530ca34e9b25b
 /deepseek-ai-dsh-terminal-bash/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -84,8 +90,8 @@
   en: 5e4dc482b93e2b06
   zh: 5b56af99bcfd74ed
 /deepseek-ai-dsh-terminal-bash/known-limitations-and-deferred-work:
-  en: 2dc221de0d3a76a7
-  zh: 822cef044e765459
+  en: 3ea672e03d66617b
+  zh: f2250333f1caf227
 /deepseek-ai-dsh-terminal-bash/known-limitations-and-deferred-work/dev-note:
-  en: e67f633dc6fe7773
-  zh: 3bb0c20c93f16f98
+  en: 34651d247c0d1bba
+  zh: b8b78bf26d28e4d6

@@ -75,6 +75,10 @@ Skill summaries retain the winning provider’s optional instruction-file `path`
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+### Host-provided access
+
+`trustedSourcesOnly` is a lookup option with a separate catalog cache identity. Filesystem providers use it to omit project and user discovery while preserving explicitly configured and bundled sources.
+
 This section explains how the registry merges, caches, and invalidates provider catalogs; the observable behavior is fully covered in [Use this package](#use-this-package).
 
 ### Design concept

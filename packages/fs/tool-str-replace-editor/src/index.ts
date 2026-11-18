@@ -64,7 +64,7 @@ function lineNumbersAt(content: string, offsets: readonly number[]): number[] {
   })
 }
 
-class MutationPolicy {
+class FilePolicy {
   private readonly policy: SandboxPolicyService | undefined
 
   constructor(ctx: Context) {
@@ -91,12 +91,13 @@ async function resolveTarget(
   ctx: Context,
   path: string,
   signal: AbortSignal,
+  sandboxPolicy: SandboxExecutionPolicy | undefined,
 ): Promise<FsTarget> {
   if (path.trim().length === 0) throw new ToolArgsError(['path must be a non-empty string'])
   if (!isAbsolute(path)) {
     throw new ToolArgsError([`The path ${path} is not an absolute path, it should start with \`/\`. Maybe you meant /${path}?`])
   }
-  return ctx.fs.resolve(path, { signal })
+  return ctx.fs.resolve(path, { signal, ...sandboxPolicy === undefined ? {} : { sandboxPolicy } })
 }
 
 async function statExisting(
@@ -217,12 +218,13 @@ async function listDirectory(
 
 async function viewPath(
   ctx: Context,
+  policy: FilePolicy,
   path: string,
   viewRange: number[] | undefined,
   maxOutputChars: number,
   exec: ToolRunContext,
 ): Promise<string> {
-  const target = await resolveTarget(ctx, path, exec.signal)
+  const target = await resolveTarget(ctx, path, exec.signal, policy.resolve(exec))
   const info = await statExisting(ctx, target, 'view', exec)
   if (info.type === 'directory') {
     if (viewRange !== undefined) {
@@ -240,14 +242,14 @@ async function viewPath(
 
 async function createFile(
   ctx: Context,
-  policy: MutationPolicy,
+  policy: FilePolicy,
   path: string,
   fileText: string | undefined,
   exec: ToolRunContext,
 ): Promise<string> {
   const content = requiredForCommand(fileText, 'file_text', 'create')
   const sandboxPolicy = policy.resolve(exec)
-  const target = await resolveTarget(ctx, path, exec.signal)
+  const target = await resolveTarget(ctx, path, exec.signal, sandboxPolicy)
   const alreadyExists = (cause?: FsError) => new FsError(
     `File already exists at: ${target.displayPath}. Cannot overwrite files using command \`create\`.`,
     'FS_ALREADY_EXISTS',
@@ -280,7 +282,7 @@ async function createFile(
 
 async function replaceInFile(
   ctx: Context,
-  policy: MutationPolicy,
+  policy: FilePolicy,
   path: string,
   oldStr: string | undefined,
   newStr: string | null | undefined,
@@ -290,7 +292,7 @@ async function replaceInFile(
     throw new ToolArgsError(['Parameter `new_str` must be omitted or contain a string for command: str_replace'])
   }
   const sandboxPolicy = policy.resolve(exec)
-  const target = await resolveTarget(ctx, path, exec.signal)
+  const target = await resolveTarget(ctx, path, exec.signal, sandboxPolicy)
   const intent = await ctx.waterfall('fs/edit-intent', target, exec, () => undefined)
   const oldValue = requiredForCommand(oldStr, 'old_str', 'str_replace', false)
   const newValue = newStr ?? ''
@@ -334,7 +336,7 @@ async function replaceInFile(
 
 async function insertInFile(
   ctx: Context,
-  policy: MutationPolicy,
+  policy: FilePolicy,
   path: string,
   insertLine: number | undefined,
   newStr: string | undefined,
@@ -343,7 +345,7 @@ async function insertInFile(
   if (insertLine === undefined) throw new ToolArgsError(['Parameter `insert_line` is required for command: insert'])
   const value = requiredForCommand(newStr, 'new_str', 'insert')
   const sandboxPolicy = policy.resolve(exec)
-  const target = await resolveTarget(ctx, path, exec.signal)
+  const target = await resolveTarget(ctx, path, exec.signal, sandboxPolicy)
   const intent = await ctx.waterfall('fs/edit-intent', target, exec, () => undefined)
   const info = await statExisting(ctx, target, 'insert', exec)
   if (info.type !== 'file') {
@@ -430,7 +432,7 @@ function presentEditorCall(args: {
 
 /** Register the model-facing `str_replace_editor` tool. */
 function registerStrReplaceEditor(ctx: Context, config: ResolvedConfig): void {
-  const policy = new MutationPolicy(ctx)
+  const policy = new FilePolicy(ctx)
   ctx.tools.register(defineTool({
     name: 'str_replace_editor',
     description: config.description,
@@ -477,7 +479,7 @@ function registerStrReplaceEditor(ctx: Context, config: ResolvedConfig): void {
     async execute(args, exec) {
       switch (args.command) {
         case 'view':
-          return viewPath(ctx, args.path, args.view_range ?? undefined, config.maxOutputChars, exec)
+          return viewPath(ctx, policy, args.path, args.view_range ?? undefined, config.maxOutputChars, exec)
         case 'create':
           return createFile(ctx, policy, args.path, args.file_text ?? undefined, exec)
         case 'str_replace':

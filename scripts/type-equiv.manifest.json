@@ -2992,6 +2992,21 @@
       "doc": "docs/subsystems/forge.md",
       "symbol": "ForgeAnnotationSource",
       "source": "packages/experimental/client-ui-forge/src/client/changes-service.ts"
+    },
+    {
+      "doc": "docs/subsystems/sandbox.md",
+      "symbol": "SandboxReadAccess",
+      "source": "packages/sandbox/sandbox/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/sandbox.md",
+      "symbol": "SandboxReadArtifact",
+      "source": "packages/sandbox/sandbox/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/core.md",
+      "symbol": "AgentCreationRequest",
+      "source": "packages/core/agent/src/index.ts"
     }
   ]
 }

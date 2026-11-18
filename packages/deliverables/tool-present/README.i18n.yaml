@@ -3,8 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/deliverables/tool-present/README.md
 /:
-  en: 77fa72665646fedb
-  zh: 2d360098a76804c8
+  en: cb3f91d54eee30e5
+  zh: cb3f91d54eee30e5
+/description-declare-accessible-files-as-deliverables-with-present-configuration-session-ownership-and-source-file-opening-kind-package-reference:
+  en: d0212d7cf5ae9e80
+  zh: 509f3300ab428af5
 /deepseek-ai-dsh-tool-present:
   en: 7a9bcbc94c211b65
   zh: 5e53b10028b5d918
@@ -12,17 +15,20 @@
   en: 79708e6e895b94d0
   zh: c98dc1ac9316eb50
 /deepseek-ai-dsh-tool-present/table-of-contents:
-  en: d152484eb41ac6b4
-  zh: 09388d293f9be9cb
+  en: eb6ed279e78f8b65
+  zh: 5583226de8ecca29
 /deepseek-ai-dsh-tool-present/use-this-package:
-  en: aecb160dd6ee85ba
-  zh: 148288a2e92236fa
+  en: 0ab6cf6de2ca0c97
+  zh: 3a96950483a1dc06
 /deepseek-ai-dsh-tool-present/understand-the-implementation:
-  en: 6e73ca41dddc096e
-  zh: b59fdfa3f3cc47e1
+  en: 57e15589824b2668
+  zh: 95f76747d673491d
+/deepseek-ai-dsh-tool-present/understand-the-implementation/host-provided-access:
+  en: a48b8453243a0415
+  zh: 178875f79d6c9d23
 /deepseek-ai-dsh-tool-present/further-exploration:
-  en: 66269384f8c0d0f7
-  zh: b3d694d2f0ae588a
+  en: 95c0cbe037530021
+  zh: 4c4e656c9d6fbfeb
 /deepseek-ai-dsh-tool-present/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -39,8 +45,8 @@
   en: c5e95beba09dce3c
   zh: 50f71fac2592f652
 /deepseek-ai-dsh-tool-present/known-limitations-and-deferred-work:
-  en: 918d8b8f09063e68
-  zh: 48591e5324a462c4
+  en: 2b4a012c4a032f1a
+  zh: 669135172056e6fa
 /deepseek-ai-dsh-tool-present/known-limitations-and-deferred-work/dev-note:
-  en: e67f633dc6fe7773
-  zh: 3bb0c20c93f16f98
+  en: 34651d247c0d1bba
+  zh: b8b78bf26d28e4d6

@@ -3,8 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/shell/bash-sandbox/README.md
 /:
-  en: 2d1caa2e6179218a
-  zh: 0b51a5dbda727ffa
+  en: cb3f91d54eee30e5
+  zh: cb3f91d54eee30e5
+/description-the-sandbox-consuming-bash-executor-for-deployments-and-maintainers-choosing-configuring-or-debugging-confined-command-execution-with-denial-and-escalation-facts-kind-package-reference:
+  en: b46781c36fc98ed3
+  zh: cec4acc118d1191d
 /deepseek-ai-dsh-bash-sandbox:
   en: 63b29753d16046c9
   zh: c7be0b83f0d2911c
@@ -12,8 +15,8 @@
   en: 37a0fcab18f972c0
   zh: f7b4222e646e7050
 /deepseek-ai-dsh-bash-sandbox/table-of-contents:
-  en: d152484eb41ac6b4
-  zh: 09388d293f9be9cb
+  en: eb6ed279e78f8b65
+  zh: 5583226de8ecca29
 /deepseek-ai-dsh-bash-sandbox/use-this-package:
   en: bd59d09bee36362c
   zh: 7086c8268e7517d5
@@ -21,8 +24,8 @@
   en: af387f23325c1435
   zh: 7a160aca5edd657e
 /deepseek-ai-dsh-bash-sandbox/use-this-package/modes-and-file-effects:
-  en: bc096fe6f8eb54cd
-  zh: 1a3e3122ca40b0e5
+  en: c487604bfda443b4
+  zh: b97c10b3162d923d
 /deepseek-ai-dsh-bash-sandbox/use-this-package/minimal-configuration:
   en: 7edc013af7a491f4
   zh: 7b64bed7e3e0d65d
@@ -33,23 +36,26 @@
   en: 0d5b6818c3dad919
   zh: cd0357477c0726c3
 /deepseek-ai-dsh-bash-sandbox/understand-the-implementation:
-  en: 05e2abe4a25886fd
-  zh: 9240b331c45ac81e
+  en: 57e15589824b2668
+  zh: 95f76747d673491d
+/deepseek-ai-dsh-bash-sandbox/understand-the-implementation/host-provided-access:
+  en: fdae44d27315616d
+  zh: 637d9e4ca08dd35f
 /deepseek-ai-dsh-bash-sandbox/understand-the-implementation/design-concept:
   en: e1b1ac62e94ce535
   zh: 5fa7a0353fbf777d
 /deepseek-ai-dsh-bash-sandbox/understand-the-implementation/source-map:
-  en: 8963005b41bfc3c6
-  zh: 7df1436563c10a19
+  en: 9260ecd7cf196720
+  zh: 26fe8ab6702a86db
 /deepseek-ai-dsh-bash-sandbox/understand-the-implementation/main-flow:
   en: 731878f592fa79c6
   zh: 3187f4c6907a13c2
 /deepseek-ai-dsh-bash-sandbox/understand-the-implementation/invariants:
-  en: 0b6c6d7e216e1d23
-  zh: 15f94cfccf4fa242
+  en: c647932d329993ec
+  zh: bf8f352789206de3
 /deepseek-ai-dsh-bash-sandbox/further-exploration:
-  en: 0e4585dbb92a0290
-  zh: 4f08980a15991c4c
+  en: f92d19585f4b5406
+  zh: 0aca52aa287220ea
 /deepseek-ai-dsh-bash-sandbox/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -90,8 +96,8 @@
   en: f5d5f97a153f7c70
   zh: f681f89596f500f5
 /deepseek-ai-dsh-bash-sandbox/known-limitations-and-deferred-work:
-  en: 056f7e09b6ad03f9
-  zh: 2996d78fbe0c70e1
+  en: d56bb9d956832e7a
+  zh: a30ebe1614f8a54f
 /deepseek-ai-dsh-bash-sandbox/known-limitations-and-deferred-work/dev-note:
-  en: e67f633dc6fe7773
-  zh: 3bb0c20c93f16f98
+  en: 34651d247c0d1bba
+  zh: b8b78bf26d28e4d6

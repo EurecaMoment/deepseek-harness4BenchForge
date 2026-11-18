@@ -3,8 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/shell/pwsh-sandbox/README.md
 /:
-  en: d42333572a114759
-  zh: 7de2bc8a30baf573
+  en: cb3f91d54eee30e5
+  zh: cb3f91d54eee30e5
+/description-the-sandbox-consuming-powershell-executor-for-deployments-and-maintainers-choosing-configuring-or-debugging-confined-powershell-command-execution-with-denial-facts-kind-package-reference:
+  en: dc94c159a57e6f15
+  zh: 29e716b10fe43ad4
 /deepseek-ai-dsh-pwsh-sandbox:
   en: e31fa5a5c2977440
   zh: 72eac87630e20992
@@ -12,8 +15,8 @@
   en: b628a56aa2afe34b
   zh: a6759e4d067f2e22
 /deepseek-ai-dsh-pwsh-sandbox/table-of-contents:
-  en: d152484eb41ac6b4
-  zh: 09388d293f9be9cb
+  en: eb6ed279e78f8b65
+  zh: 5583226de8ecca29
 /deepseek-ai-dsh-pwsh-sandbox/use-this-package:
   en: 665eb9d5f77bcfe5
   zh: 0fc5adf8b49167e2
@@ -21,8 +24,8 @@
   en: 8a43fa466bcf6fc7
   zh: 28d2381299d1e592
 /deepseek-ai-dsh-pwsh-sandbox/use-this-package/modes-and-file-effects:
-  en: a097100674539423
-  zh: 6c25043f90650113
+  en: e9f3b6c07bb40b67
+  zh: 8bf44fddb9f8c5f7
 /deepseek-ai-dsh-pwsh-sandbox/use-this-package/minimal-configuration:
   en: b025d0473f259364
   zh: 3c6f2153a68189e1
@@ -33,23 +36,26 @@
   en: 0d5b6818c3dad919
   zh: e1d21581d66efb78
 /deepseek-ai-dsh-pwsh-sandbox/understand-the-implementation:
-  en: 05e2abe4a25886fd
-  zh: 3f7f1326dc3c1d3f
+  en: 57e15589824b2668
+  zh: 95f76747d673491d
+/deepseek-ai-dsh-pwsh-sandbox/understand-the-implementation/host-provided-access:
+  en: fdae44d27315616d
+  zh: 986f775a91fffadf
 /deepseek-ai-dsh-pwsh-sandbox/understand-the-implementation/design-concept:
   en: 0209cfdeae41c9b5
   zh: f968694c21c96ec2
 /deepseek-ai-dsh-pwsh-sandbox/understand-the-implementation/source-map:
-  en: e7af8c5552806441
-  zh: 2ad6a90d828bbd73
+  en: 9aba673cef1e8f41
+  zh: e8393fe59a27c20b
 /deepseek-ai-dsh-pwsh-sandbox/understand-the-implementation/main-flow:
   en: 93f0842800cb0e52
   zh: cfde2946230560ee
 /deepseek-ai-dsh-pwsh-sandbox/understand-the-implementation/invariants:
-  en: 56b6b8d45b5fc463
-  zh: fe1a53e4ad514bc6
+  en: 75bd663ac6403134
+  zh: 70052d3eaed2d0b0
 /deepseek-ai-dsh-pwsh-sandbox/further-exploration:
-  en: ff69a14d11ec46e4
-  zh: fd4994f0796fb9d2
+  en: 3beffa80e9a49f2f
+  zh: cd256b8f2779751b
 /deepseek-ai-dsh-pwsh-sandbox/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -66,8 +72,8 @@
   en: 796af37d6f6add68
   zh: 7975ff2a21c1b4f3
 /deepseek-ai-dsh-pwsh-sandbox/known-limitations-and-deferred-work:
-  en: 9afb663f40e5b8fd
-  zh: 76ceb6bfb2a5148e
+  en: a2f01ddd7045cfc2
+  zh: e0edb306fa96aed4
 /deepseek-ai-dsh-pwsh-sandbox/known-limitations-and-deferred-work/dev-note:
-  en: e67f633dc6fe7773
-  zh: 3bb0c20c93f16f98
+  en: 34651d247c0d1bba
+  zh: b8b78bf26d28e4d6

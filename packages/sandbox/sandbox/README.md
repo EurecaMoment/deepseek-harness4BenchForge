@@ -77,6 +77,12 @@ When no backend can enforce the requested mode, the call fails with `SANDBOX_UNA
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+### Host-provided access
+
+`SandboxExecutionPolicy.readAccess` carries explicit read roots and their authority generation; see [registration and revocation](../sandbox-policy/README.md).
+
+Trusted service outputs may add exact physical file grants within the current authority generation. These grants record device and inode, expose no parent directory, and disappear when the generation changes. File reads and process mounts reject replacement inodes; this is a Host/service API, never a model-supplied permission request.
+
 This section explains the design decisions behind the contract and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
 
 ### Design philosophy

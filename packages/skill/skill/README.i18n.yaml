@@ -3,8 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/skill/skill/README.md
 /:
-  en: ab82ac4bcc012854
-  zh: 3e2a2326e66f4bc3
+  en: cb3f91d54eee30e5
+  zh: cb3f91d54eee30e5
+/description-the-skill-provider-registry-for-users-and-maintainers-choosing-configuring-or-debugging-how-skills-from-any-source-are-merged-resolved-and-loaded-kind-package-reference:
+  en: fbf6fe01aad8685d
+  zh: 516e63d1087c4b14
 /deepseek-ai-dsh-skill:
   en: 083f1e1c7ffedaad
   zh: e52812b66ea22539
@@ -12,8 +15,8 @@
   en: dac8069f518e183c
   zh: 2e4f2983030f9270
 /deepseek-ai-dsh-skill/table-of-contents:
-  en: d152484eb41ac6b4
-  zh: 09388d293f9be9cb
+  en: eb6ed279e78f8b65
+  zh: 5583226de8ecca29
 /deepseek-ai-dsh-skill/use-this-package:
   en: cb13ae81a3e0ae68
   zh: e709d66f4b6b4dd5
@@ -21,23 +24,26 @@
   en: ce05cda6706f18b7
   zh: 3262ebdaf645cb9a
 /deepseek-ai-dsh-skill/use-this-package/mount-and-configure:
-  en: b8f130e081d14307
-  zh: d227ad3298b20238
+  en: 36982d698ff42b1a
+  zh: d3b23493c3bcbbab
 /deepseek-ai-dsh-skill/use-this-package/what-the-registry-gives-you:
-  en: 0cb7936c76a84e45
-  zh: a1fb8572481af54c
+  en: 2ef159076ed21fb9
+  zh: a9b1c8eade754dec
 /deepseek-ai-dsh-skill/use-this-package/observable-success-and-failures:
   en: 46f81f14f5ccfcc1
   zh: a74a1f8511a8de1e
 /deepseek-ai-dsh-skill/understand-the-implementation:
-  en: 89be1dad151abb04
-  zh: 9a1915c4d55bb9d2
+  en: 57e15589824b2668
+  zh: 95f76747d673491d
+/deepseek-ai-dsh-skill/understand-the-implementation/host-provided-access:
+  en: 6fd78bda4c4ce0e1
+  zh: 64f9e088e35e3cae
 /deepseek-ai-dsh-skill/understand-the-implementation/design-concept:
   en: c0fb1850f00f24b1
   zh: 226883ab5635435d
 /deepseek-ai-dsh-skill/understand-the-implementation/source-map:
-  en: c7f6f2ecb227c68b
-  zh: b2e924975aec9692
+  en: 9de929c214177128
+  zh: 103d7a2ca39dbac6
 /deepseek-ai-dsh-skill/understand-the-implementation/catalog-collection:
   en: 58a9b57dc504b69f
   zh: 8fe8011247bc3f2b
@@ -48,8 +54,8 @@
   en: d73258316127f5b5
   zh: ddc6690f88922782
 /deepseek-ai-dsh-skill/further-exploration:
-  en: 6aeabc2349d39438
-  zh: 91855eb502e5f12f
+  en: 8ac52a01b94f5066
+  zh: 604297e060951637
 /deepseek-ai-dsh-skill/model-experience:
   en: 84f7d6e986f88425
   zh: 0fdc2326d8efb13e
@@ -57,8 +63,8 @@
   en: 628a45ff9f6b0e74
   zh: fda70b0eed2df1d7
 /deepseek-ai-dsh-skill/known-limitations-and-deferred-work:
-  en: c5456e001203fd7a
-  zh: 3cc6fa50700eec13
+  en: 915e204c879d11a4
+  zh: c3d90d9599c0fab7
 /deepseek-ai-dsh-skill/known-limitations-and-deferred-work/dev-note:
-  en: 259ce6914314397d
-  zh: d500b1f988a83999
+  en: f1cc54e95c38a287
+  zh: 5b30c0b669bfa961

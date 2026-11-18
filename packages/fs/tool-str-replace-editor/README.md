@@ -62,6 +62,10 @@ A metadata miss from `view`, `str_replace`, or `insert` records confirmed absenc
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+### Host-provided access
+
+File inputs resolve the calling Session's sandbox policy before metadata and content access, including explicit read roots and authority generations. Calls without a read registration retain their existing behavior.
+
 This section explains the design decisions behind the editor tool and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
 
 ### Design concept

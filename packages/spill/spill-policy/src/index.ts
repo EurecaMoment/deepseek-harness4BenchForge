@@ -15,6 +15,7 @@ import type { SpillRef } from '@deepseek-ai/dsh-spill'
 import type { PostToolDecision, ToolExecution } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-attachment'
 import type {} from '@deepseek-ai/dsh-fs'
+import type {} from '@deepseek-ai/dsh-sandbox-policy'
 import type { SpillPolicyExec } from './types.ts'
 import { formatSpillNotice } from './notice.ts'
 import { retainContent } from './retention.ts'
@@ -76,7 +77,7 @@ export function apply(ctx: Context, config: Config): void {
   }
 
   /** Full ordered text with an execution-readable attachment path at each image position. */
-  function fullText(content: RetainableBlock[]): string {
+  function fullText(content: RetainableBlock[], exec: ToolExecution): string {
     return content.map((block) => {
       if (block.type === 'text') return block.text
       const attachments = ctx.get('attachments')
@@ -84,6 +85,9 @@ export function apply(ctx: Context, config: Config): void {
       const access = attachments === undefined || fs === undefined ? undefined : resolveImageAttachmentAccess(
         attachments, path => fs.processPathFromHostPath(path), block.attachment)
       if (access === undefined) throw new Error(`image ${block.attachment.attachmentId} has no readable attachment path`)
+      const policyService = ctx.get('sandboxPolicy')
+      const policy = policyService?.resolve({ session: exec.agent?.session })
+      if (policyService !== undefined && policy?.readAccess !== undefined) policyService.registerReadArtifact(policy, access.readonlyPath)
       return `\n[Image: ${JSON.stringify(access.readonlyPath)}; ${block.attachment.mediaType}; ${block.attachment.width}x${block.attachment.height}. Use read_image to view it.]\n`
     }).join('')
   }
@@ -101,10 +105,13 @@ export function apply(ctx: Context, config: Config): void {
       if (owner === undefined) throw new Error(`no session owner for ${toolName} ${label}`)
       const spillStore = ctx.get('spillStore')
       if (spillStore === undefined) throw new Error('no ctx.spillStore backend loaded')
+      const policyService = ctx.get('sandboxPolicy')
+      const policy = policyService?.resolve({ session: exec.agent?.session })
       const ref: SpillRef = await spillStore.saveText({
         owner: { sessionId: owner }, source: { kind: 'tool', toolName, callId, label },
-        suggestedName: `${toolName}.txt`, content: fullText(content),
+        suggestedName: `${toolName}.txt`, content: fullText(content, exec),
       })
+      if (policyService !== undefined && policy?.readAccess !== undefined) policyService.registerReadArtifact(policy, ref.locator)
       const totalBytes = content.reduce((total, block) => total + (block.type === 'text' ? Buffer.byteLength(block.text, 'utf8') : 0), 0)
       const notice = (bytes: number, count: number): Extract<RetainableBlock, { type: 'text' }> => ({
         type: 'text', text: formatSpillNotice({ kind: 'exact', count: bytes }, ref, count),

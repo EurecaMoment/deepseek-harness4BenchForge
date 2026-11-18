@@ -10,6 +10,7 @@
  */
 
 import type {} from '@deepseek-ai/dsh-working-directory'
+import type {} from '@deepseek-ai/dsh-sandbox-policy'
 import type { Context } from '@deepseek-ai/cordis'
 import { isDeepStrictEqual } from 'node:util'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
@@ -114,6 +115,8 @@ export function apply(ctx: Context, config: Config): void {
     touchedPaths: readonly string[] = [],
   ): Promise<UserMessage | undefined> => {
     signal.throwIfAborted()
+    // Isolated hosts supply their instructions explicitly; workspace data never becomes authority.
+    if (ctx.get('sandboxPolicy')?.resolve({ session: agent.session }).readAccess !== undefined) return undefined
     if (resolved.maxBytes <= 0 || !Number.isFinite(resolved.maxBytes)) {
       return undefined
     }

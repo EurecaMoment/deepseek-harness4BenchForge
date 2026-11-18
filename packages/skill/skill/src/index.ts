@@ -104,6 +104,8 @@ export type SkillRegistration = Omit<SkillDefinition, 'invocation' | 'provider'>
 
 /** Caller context used for cwd-sensitive and abortable provider work. */
 export interface SkillLookupOptions {
+  /** Restrict automatic filesystem discovery to explicitly configured and bundled sources; omission includes defaults. */
+  readonly trustedSourcesOnly?: boolean | undefined
   /** Workspace selector for the current lookup. */
   readonly cwd?: string | undefined
   /** Abort discovery or loading work for the current caller. */
@@ -528,6 +530,7 @@ export class SkillRegistry extends Service {
       // recompose re-parents an existing scope without touching this registry,
       // and only a chain-bearing key makes the next read see the new preset.
       const key = this.collectCacheKey(options.cwd, scopeChainOf(options.scope), revision)
+        + (options.trustedSourcesOnly === true ? ':trusted-sources' : '')
       const cached = this.collectCache.get(key)
       if (cached !== undefined) return { entries: cached, cacheable: true }
 

@@ -186,6 +186,20 @@ describe('dsh-skill-filesystem plugin exports', () => {
 })
 
 describe('FileSystemSkillProvider', () => {
+  it('does not discover project or user instructions in a trusted-sources-only lookup', async () => {
+    const home = await tempDir('trusted-skill-home')
+    const project = await tempDir('trusted-skill-project')
+    const custom = await tempDir('trusted-skill-custom')
+    await mkdir(join(project, '.git'), { recursive: true })
+    await writeSkill(join(project, '.dsh/skills'), 'project-skill', 'Project data')
+    await writeSkill(join(home, '.dsh/skills'), 'user-skill', 'User data')
+    await writeSkill(custom, 'trusted-skill', 'Configured source')
+    const ctx = await setupLocal(home, { customSkillDirs: [custom], watch: false })
+    expect((await ctx.skills.list({ cwd: project })).map(skill => skill.name)).toContain('project-skill')
+    expect((await ctx.skills.list({ cwd: project, trustedSourcesOnly: true })).map(skill => skill.name)).toEqual(['trusted-skill'])
+    expect(await ctx.skills.get('project-skill', { cwd: project, trustedSourcesOnly: true })).toBeUndefined()
+  })
+
   it('discovers project, custom, user, and agents skill roots in priority order', async () => {
     const home = await tempDir('skill-home')
     const project = await tempDir('skill-project')

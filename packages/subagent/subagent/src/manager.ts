@@ -839,7 +839,10 @@ export class SubagentManager {
           if (workingDirectory === undefined) {
             throw new SubagentError('local subagents require the working-directory service', 'WORKING_DIRECTORY_UNAVAILABLE')
           }
-          await workingDirectory.set(child, create.cwd, inputs.signal)
+          const initialCwd = child.session.header.cwd !== create.meta.cwd
+            ? child.session.header.cwd ?? create.cwd
+            : create.cwd
+          await workingDirectory.set(child, initialCwd, inputs.signal)
         }
         if (inputs.composition.agentPreset === undefined) await applyChildComposition(childCtx, create?.parent, inputs.composition)
         if (inputs.outputSchema !== undefined) {

@@ -95,6 +95,7 @@ export class SandboxPwshExecutor extends PwshLocalExecutor {
 
   override async execute(spec: ShellExecSpec): Promise<ShellExecution> {
     const policy = spec.sandboxPolicy as SandboxExecutionPolicy
+    this.ctx.sandboxPolicy.assertReadAccess(policy)
     const { mode } = policy
     if (mode === 'danger-full-access') {
       return SandboxPwshExecutor.decorateResult(
@@ -102,9 +103,11 @@ export class SandboxPwshExecutor extends PwshLocalExecutor {
         result => ({ ...result, sandbox: { mode, denied: false } }),
       )
     }
+    const lease = this.ctx.sandboxPolicy.leaseReadAccess(policy, spec.signal)
     let confined: ConfinedArgv | undefined
-    const ex = await this.executeArgv(spec, async (signal) => {
+    const ex = await this.executeArgv({ ...spec, signal: lease.signal }, async (signal) => {
       const prepared = await this.confine(spec, { ...policy, mode }, signal)
+      this.ctx.sandboxPolicy.assertReadAccess(policy)
       signal.throwIfAborted()
       confined = prepared
       return prepared.argv
@@ -118,8 +121,14 @@ export class SandboxPwshExecutor extends PwshLocalExecutor {
         runnerProgram: facts.argv[0],
         workdir: spec.workdir,
       })
-    })
+    }).catch((error: unknown) => { lease.dispose(); throw error })
+    void ex.done.then(() => { lease.dispose() })
+    this.authorizeOutputFiles(ex, policy)
     return SandboxPwshExecutor.decorateResult(ex, (result) => {
+      this.ctx.sandboxPolicy.assertReadAccess(policy)
+      for (const output of [result.stdout, result.stderr]) {
+        if (output.spillPath !== undefined) this.ctx.sandboxPolicy.registerReadArtifact(policy, output.spillPath)
+      }
       if (confined === undefined) return { ...result, sandbox: { mode, denied: false } }
       const { enforcement, denialSignatures, runnerFailureRules } = confined
       // Runner failure outranks denial because the command did not run. Carry
@@ -137,6 +146,30 @@ export class SandboxPwshExecutor extends PwshLocalExecutor {
       }
       throw error
     })
+  }
+
+  /** Grant exact trusted collector outputs without exposing the global spill directory. */
+  private authorizeOutputFiles(execution: ShellExecution, policy: SandboxExecutionPolicy): void {
+    if (policy.readAccess === undefined || policy.mode === 'danger-full-access') return
+    const authority = this.ctx.sandboxPolicy
+    const readOutput = execution.readOutput.bind(execution)
+    execution.readOutput = () => {
+      authority.assertReadAccess(policy)
+      const result = readOutput()
+      for (const path of [result.stdoutSpillPath, result.stderrSpillPath]) {
+        if (path !== undefined) authority.registerReadArtifact(policy, path)
+      }
+      return result
+    }
+    for (const stream of ['stdout', 'stderr'] as const) {
+      const reader = execution.observed[stream]
+      execution.observed[stream] = { readFrom: (offset) => {
+        authority.assertReadAccess(policy)
+        const result = reader.readFrom(offset)
+        if (result.spillPath !== undefined) authority.registerReadArtifact(policy, result.spillPath)
+        return result
+      } }
+    }
   }
 
   /**

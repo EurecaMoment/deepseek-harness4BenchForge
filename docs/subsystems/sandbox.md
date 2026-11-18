@@ -43,11 +43,7 @@ type SandboxEnforcement = 'full' | 'partial'
 The complete execution policy is resolved and carried per capability call. It includes `danger-full-access` so a consumer can resolve policy once before deciding whether to bypass confinement. Normal tool calls derive `workspaceRoot` from the calling session's immutable cwd; deployment configuration supplies the agentless fallback and shared additional write grants. Live Session registrations add effect-scoped directories to subsequent resolutions. The resolver preserves absolute execution-world spelling. Enforcing providers canonicalize the root where the files exist, so a cwd containing `symlink/..` identifies the directory where the paired subprocess provider actually runs.
 
 ```ts type-equiv
-/**
- * The complete file-effect policy resolved for one capability call. The root
- * is carried even under modes that do not consume it so callers can resolve
- * policy once before choosing the enforcement path.
- */
+/** Complete execution policy; absent readAccess preserves unrestricted reads. */
 interface SandboxExecutionPolicy {
   /** The file-effect mode this execution runs under. */
   mode: SandboxMode
@@ -69,6 +65,8 @@ interface SandboxExecutionPolicy {
    * for agentless calls, which fall back to per-call backend state.
    */
   sessionId?: SessionId
+  /** Opt-in read isolation. Omission preserves the existing unrestricted-read policy. */
+  readAccess?: SandboxReadAccess
 }
 ```
 
@@ -78,7 +76,7 @@ interface SandboxExecutionPolicy {
 /** Inputs that select the sandbox policy for one capability call. */
 interface SandboxPolicyRequest {
   /** Calling session; its immutable cwd becomes the workspace boundary. */
-  session?: Session
+  session?: Session | undefined
   /** Explicit approved mode override, which outranks session policy. */
   mode?: SandboxMode
 }
@@ -159,6 +157,39 @@ interface ConfinedArgv {
 
 The [local provider](../../packages/sandbox/sandbox-local/README.md) owns operator configuration and maps its runner dialect into these rules. The [sandboxed bash consumer](../../packages/shell/bash-sandbox/README.md) owns spawn and result attribution.
 
+## Explicit read authority
+
+A trusted Host may register `SandboxReadAccess` for a Session. Its physical directory roots and exact output-file identities limit reads independently of the write mode. Confined processes require isolated process visibility and no network access; a provider that cannot enforce these restrictions rejects the call. A newer epoch revokes retained executions and stale policy snapshots. Omission preserves unrestricted reads, and `danger-full-access` bypasses this policy.
+
+```ts type-equiv
+/**
+ * Explicit read authority supplied by a trusted host. Processes using this
+ * authority also require isolated process visibility and no network access.
+ */
+interface SandboxReadAccess {
+  /** Complete physical read allow-list, including the workspace and runtime dependencies. */
+  readonly roots: readonly string[]
+  /** Trusted authority identity; changing its grants requires a new epoch. */
+  readonly policyId: string
+  /** Monotonically increasing authority generation. */
+  readonly epoch: number
+  /** Exact trusted output files; identity is checked again before reads and process mounts. */
+  readonly artifacts?: readonly SandboxReadArtifact[]
+}
+```
+
+```ts type-equiv
+/** Physical inode of one trusted service output, never a directory grant. */
+interface SandboxReadArtifact {
+  /** Canonical absolute filename. */
+  readonly path: string
+  /** Decimal filesystem device identity. */
+  readonly device: string
+  /** Decimal inode identity; replacement invalidates access. */
+  readonly inode: string
+}
+```
+
 ## Provider and fail-closed errors
 
 `await ctx.sandbox.confine(argv, policy, signal)` resolves policy paths and returns a `ConfinedArgv` from the execution world, or rejects with `SandboxUnavailableError` and code `SANDBOX_UNAVAILABLE` when no usable backend exists, or with `SandboxPreparationError` (`SANDBOX_PREPARATION_FAILED`, `SANDBOX_INVALID_TEMP_ROOT`) when the provider cannot prepare host state for the mode. The optional signal cancels resolution before launch. Consumers may also classify a failure while spawning or observing the returned argv; that attribution belongs to the consumer contract. Silent unconfined passthrough is never legal for a confined policy.
@@ -219,6 +250,36 @@ The sandbox-policy service (`ctx.sandboxPolicy`). Owns the deployment default mo
 resolve(request: SandboxPolicyRequest = {}): SandboxExecutionPolicy
 
 /**
+ * Register read roots; disposal retains a deny-all generation until reauthorized.
+ * @param session - exact Session whose future operations receive these grants.
+ * @param access - trusted identity, monotonically increasing generation, and absolute roots.
+ * @returns the owning Cordis effect disposer; stale disposers do not revoke newer grants.
+ */
+registerReadAccess(session: Session, access: SandboxReadAccess): () => void
+
+/**
+ * Refuse a target or process snapshot resolved before its authority changed.
+ * @param policy - resolved execution authority; unrestricted calls require no read registration.
+ */
+assertReadAccess(policy: SandboxExecutionPolicy): void
+
+/**
+ * Cancel an in-flight operation when its registered read authority changes.
+ * @param policy - execution snapshot checked before the listener is installed.
+ * @param signal - optional caller cancellation, combined with revocation.
+ * @returns cancellation signal and a disposer to release when execution settles.
+ */
+leaseReadAccess(policy: SandboxExecutionPolicy, signal?: AbortSignal): { signal: AbortSignal; dispose: () => void }
+
+/**
+ * Grant one file produced by a trusted service under the current read generation.
+ * @param policy - owner snapshot captured before the service produced the file.
+ * @param path - service-owned physical output filename, never model-supplied input.
+ * @returns the physical path; future resolutions include only this file's inode.
+ */
+registerReadArtifact(policy: SandboxExecutionPolicy, path: string): string
+
+/**
  * Permit writes under one directory in this Session's future workspace-write
  * operations. The calling context owns the effect; disposal removes only this
  * registration. Other grants to the directory remain effective. Existing
@@ -238,6 +299,50 @@ registerWritableRoot(session: Session, directory: string): () => void
  * @returns the last logged mode, or `undefined` without one.
  */
 overrideOf(session: Session): SandboxMode | undefined
+```
+
+Types: [Session](session.md)
+
+Source: [`packages/sandbox/sandbox-policy/src/index.ts`](../../packages/sandbox/sandbox-policy/src/index.ts)
+
+<a id="sandbox-events"></a>
+
+### `sandbox/*` events
+
+<a id="sandboxread-access-changed--emit"></a>
+
+#### `sandbox/read-access-changed` — emit
+
+Revoke stale in-flight operations after committing new authority.
+
+```ts cordis-catalog
+/**
+ * Revoke stale in-flight operations after committing new authority.
+ * @mode emit
+ * @param session - authority owner.
+ * @param access - committed read grants.
+ */
+'sandbox/read-access-changed'(session: Session, access: SandboxReadAccess): void
+```
+
+Types: [Session](session.md)
+
+Source: [`packages/sandbox/sandbox-policy/src/index.ts`](../../packages/sandbox/sandbox-policy/src/index.ts)
+
+<a id="sandboxread-access-changing--emit"></a>
+
+#### `sandbox/read-access-changing` — emit
+
+Announce a proposed authority change before committing it.
+
+```ts cordis-catalog
+/**
+ * Announce a proposed authority change before committing it.
+ * @mode emit
+ * @param session - authority owner.
+ * @param access - proposed read grants.
+ */
+'sandbox/read-access-changing'(session: Session, access: SandboxReadAccess): void
 ```
 
 Types: [Session](session.md)

@@ -18,6 +18,7 @@ import type {
 } from '@deepseek-ai/dsh-terminal'
 import { unsupportedModel, unsupportedInbox } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { brandString } from '@deepseek-ai/dsh-brand'
+import SandboxPolicyService from '@deepseek-ai/dsh-sandbox-policy'
 
 const agentScopeDisposers = new WeakMap<Agent, () => Promise<void>>()
 const ptyServiceDisposers = new WeakMap<Context, () => Promise<void>>()
@@ -159,6 +160,48 @@ describe('TerminalSessionService backend registry', () => {
 })
 
 describe('TerminalSessionService ownership and lifecycle', () => {
+  it('rolls back unpublished PTYs even when the backend ignores authority cancellation', async () => {
+    const ctx = await harness()
+    await ctx.plugin(SandboxPolicyService, { mode: 'workspace-write' })
+    const gate = Promise.withResolvers<TerminalBackendSession>()
+    const session = new StubSession()
+    ctx.terminals.registerBackend({ type: 'slow', spawn: () => gate.promise })
+    const owner = stubAgent(ctx, 'pending-read-owner')
+    await ctx.agents.register(owner)
+    ctx.sandboxPolicy.registerReadAccess(owner.session, { policyId: 'pending', epoch: 1, roots: ['/workspace/a'] })
+    const pending = ctx.terminals.spawn(owner, { type: 'slow' })
+    const failure = pending.catch((error: unknown) => error)
+    ctx.sandboxPolicy.registerReadAccess(owner.session, { policyId: 'pending', epoch: 2, roots: [] })
+    gate.resolve(session)
+    expect(await failure).toMatchObject({ code: 'OWNER_NOT_LIVE' })
+    expect(ctx.terminals.list(owner)).toEqual([])
+    expect(session.closed).toEqual(['PTY spawn rolled back'])
+    await ctx.fiber.dispose()
+  })
+
+  it.each([false, true])('closes stale authority before admitting another PTY and refuses sends during cleanup (restored Session=%s)', async (restored) => {
+    const ctx = await harness()
+    await ctx.plugin(SandboxPolicyService, { mode: 'workspace-write' })
+    const b = backend()
+    ctx.terminals.registerBackend(b.provider)
+    const owner = stubAgent(ctx, 'read-owner')
+    await ctx.agents.register(owner)
+    ctx.sandboxPolicy.registerReadAccess(owner.session, { policyId: 'owner', epoch: 1, roots: ['/workspace/a'] })
+    const first = await ctx.terminals.spawn(owner, { type: 'stub' })
+    const gate = Promise.withResolvers<undefined>()
+    b.sessions[0]!.closeGate = gate
+    const authorityOwner = restored ? Session.create(owner.session.id) : owner.session
+    ctx.sandboxPolicy.registerReadAccess(authorityOwner, { policyId: 'owner', epoch: 2, roots: [] })
+    expect(() => ctx.terminals.startSend(owner, first.sessionId, { text: 'cat ../b/secret', submit: true })).toThrow('closing')
+    const pending = ctx.terminals.spawn(owner, { type: 'stub' })
+    expect(b.sessions).toHaveLength(1)
+    gate.resolve(undefined)
+    const next = await pending
+    expect(next.sessionId).not.toBe(first.sessionId)
+    expect(b.sessions[0]!.closed).toEqual(['PTY read authority changed'])
+    await ctx.fiber.dispose()
+  })
+
   it('publishes only after spawn and fences every operation to the exact owner', async () => {
     const ctx = await harness()
     const b = backend()

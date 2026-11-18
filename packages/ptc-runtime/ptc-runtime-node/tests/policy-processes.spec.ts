@@ -44,6 +44,18 @@ it('starts cleanup without another execution and retains the Promise for subsequ
   } finally { cleanup.resolve(undefined) }
 })
 
+it('invalidates retained processes on read-access generation changes and refuses old snapshots', async () => {
+  const { ctx, session, processes } = await setup()
+  ctx.sandboxPolicy.registerReadAccess(session, { policyId: 'session', epoch: 1, roots: [process.cwd()] })
+  const policy = ctx.sandboxPolicy.resolve({ session })
+  const release = vi.fn(async () => {})
+  processes.register(policy, release)
+  ctx.sandboxPolicy.registerReadAccess(session, { policyId: 'session', epoch: 2, roots: [] })
+  await processes.wait(session.id)
+  expect(release).toHaveBeenCalledTimes(1)
+  expect(() => processes.register(policy, release)).toThrow('expired')
+})
+
 it('uses the standing policy for a temporary escalation and ignores detached resources', async () => {
   const { session, processes, policy } = await setup()
   const release = vi.fn(async () => {})

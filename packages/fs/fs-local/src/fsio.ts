@@ -6,7 +6,7 @@
  */
 
 import { randomUUID } from 'node:crypto'
-import { createReadStream, realpath as realpathCallback } from 'node:fs'
+import { constants, createReadStream, realpath as realpathCallback } from 'node:fs'
 import { chmod, link, lstat, mkdir, open, readFile, readdir, rename, rm, stat } from 'node:fs/promises'
 import type { BigIntStats, Dirent, Stats } from 'node:fs'
 import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
@@ -63,9 +63,14 @@ function throwIfAborted(signal: AbortSignal | undefined, verb: string): void {
  * `readFile` with a bare `AbortError`, which would otherwise escape the seam's
  * error taxonomy — the streaming/write paths translate it the same way).
  */
-async function readFileAbortable(absolutePath: string, displayPath: string, verb: 'read' | 'edit', signal?: AbortSignal): Promise<Buffer> {
+async function readFileAbortable(absolutePath: string, displayPath: string, verb: 'read' | 'edit', signal?: AbortSignal, noFollow = false): Promise<Buffer> {
   try {
-    return await readFile(absolutePath, signal ? { signal } : {})
+    if (!noFollow) return await readFile(absolutePath, signal ? { signal } : {})
+    const handle = await open(absolutePath, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
+    try {
+      if (!(await handle.stat()).isFile()) throw new FsError(`cannot ${verb} "${displayPath}": not a regular file`, 'FS_NOT_REGULAR_FILE')
+      return await handle.readFile(signal ? { signal } : {})
+    } finally { await handle.close() }
   } catch (error: unknown) {
     if (isAbortError(error)) throw new FsError(`${verb} aborted`, 'FS_ABORTED')
     throw fsErrorFromErrno(verb, displayPath, error)
@@ -258,10 +263,11 @@ async function probeStats<T extends Stats | BigIntStats>(
 /**
  * Probe a path for its version, mode, type, and size. Null if absent.
  * @param absolutePath - the path to stat (typically a target key; symlinks are followed).
+ * @param noFollow - inspect the final entry without following links for a pinned mutation.
  * @returns the metadata, or null when the path — or a parent segment — does not exist.
  */
-export async function probe(absolutePath: string): Promise<PathInfo | null> {
-  const info = await probeStats(absolutePath, path => stat(path, { bigint: true }))
+export async function probe(absolutePath: string, noFollow = false): Promise<PathInfo | null> {
+  const info = await probeStats(absolutePath, path => (noFollow ? lstat : stat)(path, { bigint: true }))
   if (!info) return null
   return {
     version: versionOf(info),
@@ -608,7 +614,7 @@ export async function writeFileAtomic(
   mode: number | undefined,
   signal: AbortSignal | undefined,
   internals: FsIoInternals = {},
-  options: { displayPath?: string; createIfAbsent?: boolean; existingDestination?: boolean } = {},
+  options: { displayPath?: string; createIfAbsent?: boolean; existingDestination?: boolean; noFollow?: boolean | undefined } = {},
 ): Promise<void> {
   const displayPath = options.displayPath ?? absolutePath
   const existingDestination = options.existingDestination ?? mode !== undefined
@@ -620,7 +626,7 @@ export async function writeFileAtomic(
   const stagingDirName = internals.tempDirName?.(absolutePath) ?? `.${basename(absolutePath)}.${process.pid}.${randomUUID()}.tmpdir`
   const stagingDir = join(directory, stagingDirName)
   const tempName = internals.tempName?.(absolutePath) ?? `${basename(absolutePath)}.tmp`
-  const tempPath = join(stagingDir, tempName)
+  let tempPath = join(stagingDir, tempName)
   const platform = internals.platform ?? process.platform
   const copyFileDacl = internals.copyFileDacl ?? copyFileDaclWin32
   const replaceFile = internals.replaceFile ?? replaceFileWin32
@@ -630,11 +636,16 @@ export async function writeFileAtomic(
   const removeStagingDir = internals.removeStagingDir
     ?? (path => rm(path, { recursive: true, force: true }))
   let handle: Awaited<ReturnType<typeof open>> | undefined
+  let stagingHandle: Awaited<ReturnType<typeof open>> | undefined
   let stagingCreated = false
   try {
     await mkdir(stagingDir, { mode: 0o700 })
     stagingCreated = true
-    await chmod(stagingDir, 0o700)
+    if (options.noFollow) {
+      stagingHandle = await open(stagingDir, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW)
+      await stagingHandle.chmod(0o700)
+      tempPath = `/proc/self/fd/${stagingHandle.fd}/${tempName}`
+    } else { await chmod(stagingDir, 0o700) }
 
     handle = await open(tempPath, 'wx', 0o600)
     await handle.chmod(0o600)
@@ -684,8 +695,8 @@ export async function writeFileAtomic(
       }
     }
     if (!stagingCreated) throw failure
-    return removeStagingDirOrThrow(stagingDir, failure, removeStagingDir)
-  }
+    return await removeStagingDirOrThrow(stagingDir, failure, removeStagingDir)
+  } finally { await stagingHandle?.close() }
 }
 
 /**
@@ -755,15 +766,17 @@ function countOccurrences(content: string, needle: string): number {
  * @param absolutePath - the file to read (typically a target key).
  * @param displayPath - the caller-facing path used in error messages.
  * @param signal - aborts the read (`FS_ABORTED`).
+ * @param noFollow - reject a final-component link while opening the mutation source.
  * @returns the LF-normalized content and the detected style to restore on write-back.
  */
 export async function readForEdit(
   absolutePath: string,
   displayPath: string,
   signal?: AbortSignal,
+  noFollow = false,
 ): Promise<{ content: string; lineEndings: LineEndings }> {
   throwIfAborted(signal, 'edit')
-  const buffer = await readFileAbortable(absolutePath, displayPath, 'edit', signal)
+  const buffer = await readFileAbortable(absolutePath, displayPath, 'edit', signal, noFollow)
   throwIfAborted(signal, 'edit')
   if (buffer.includes(0)) throw new FsError(`cannot edit "${displayPath}": binary file`, 'FS_NOT_TEXT')
   const raw = decodeUtf8(buffer, 'edit', displayPath)
@@ -779,6 +792,7 @@ export async function readForEdit(
  * @param absolutePath - the file to read (typically a target key).
  * @param maxBytes - exclusive upper bound for bytes held as the contextual-diff basis.
  * @param signal - aborts the read (`FS_ABORTED`); cancellation propagates, unlike I/O failure.
+ * @param noFollow - reject a final-component link while opening the diff source.
  * @returns the LF-normalized text, or null for a non-regular, at/above-limit, binary, non-UTF-8,
  * descriptor-size-changed, or unreadable file.
  */
@@ -786,10 +800,11 @@ export async function readTextForDiff(
   absolutePath: string,
   maxBytes: number,
   signal?: AbortSignal,
+  noFollow = false,
 ): Promise<string | null> {
   throwIfAborted(signal, 'read')
   try {
-    const handle = await open(absolutePath, 'r')
+    const handle = await open(absolutePath, noFollow ? constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK : 'r')
     let buffer: Buffer
     let total = 0
     let openedSize = 0

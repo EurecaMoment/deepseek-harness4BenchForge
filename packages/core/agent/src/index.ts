@@ -31,6 +31,21 @@ declare module '@deepseek-ai/cordis' {
   interface Context {
     agents: AgentRegistry
   }
+  interface Events {
+    /**
+     * Prepare creation metadata before the Session or Agent exists.
+     * @mode waterfall
+     * @param request - mutable creation envelope; replace its options before calling next.
+     * @param next - continue with the current envelope, preserving caller ownership.
+     */
+    'agent/create'(request: AgentCreationRequest, next: () => Promise<AgentHandle>): Promise<AgentHandle>
+  }
+}
+
+/** Creation settings shared by ordered preparation hooks before a Session exists. */
+export interface AgentCreationRequest {
+  /** Replace to prepare creation without mutating the caller's options object. */
+  options: CreateAgentOptions
 }
 
 /**
@@ -415,8 +430,11 @@ export class AgentRegistry extends Service {
     // capability and need no Cordis tracker magic.
     const { target } = this.requireFactory()
     const receiver = getTraceable(ownerCtx, target)
-    // oxlint-disable-next-line typescript/unbound-method -- Reflect.apply intentionally supplies the caller-traced receiver
-    return Reflect.apply(target.createAgent, receiver, [ownerCtx, options])
+    const request: AgentCreationRequest = { options }
+    return ownerCtx.waterfall('agent/create', request, () => {
+      // oxlint-disable-next-line typescript/unbound-method -- Reflect.apply intentionally supplies the caller-traced receiver
+      return Reflect.apply(target.createAgent, receiver, [ownerCtx, request.options])
+    })
   }
 
   /**

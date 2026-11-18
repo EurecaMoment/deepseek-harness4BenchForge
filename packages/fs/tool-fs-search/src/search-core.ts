@@ -21,7 +21,7 @@
 
 import { isAbsolute, relative, sep } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
-import { spawnRipgrep } from '@deepseek-ai/dsh-util-ripgrep'
+import { resolveRgPath, spawnRipgrep } from '@deepseek-ai/dsh-util-ripgrep'
 export { resolveRgPath } from '@deepseek-ai/dsh-util-ripgrep'
 import { HarnessError } from '@deepseek-ai/dsh-llm'
 import { ItemRetainer, TextRetainer } from '@deepseek-ai/dsh-output-retention'
@@ -29,6 +29,8 @@ import type { RetainedItems } from '@deepseek-ai/dsh-output-retention'
 import type { SubprocessHandle, SubprocessOutcome, SubprocessOutputRead, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
 import type { SaveTextSpill, SpillRef } from '@deepseek-ai/dsh-spill'
 import type { ToolExecution } from '@deepseek-ai/dsh-tools'
+import type {} from '@deepseek-ai/dsh-sandbox'
+import type {} from '@deepseek-ai/dsh-sandbox-policy'
 
 /**
  * Default cap on the complete raw `rg` stdout the tools will parse (the
@@ -163,8 +165,8 @@ function completeStdout(toolName: string, stdout: SubprocessOutputRead, rawOutpu
  * (`@deepseek-ai/dsh-tool-call-timeout-policy`) and caller cancellation terminate the
  * process tree.
  *
- * The spawn is unconfined (a plain `ctx.subprocess` call), so `--no-config`
- * is prepended: a host `RIPGREP_CONFIG_PATH` (or `rg.conf` next to the
+ * Explicit read grants use `ctx.sandbox`; legacy calls use `ctx.subprocess`
+ * directly. `--no-config` is prepended: a host `RIPGREP_CONFIG_PATH` (or `rg.conf` next to the
  * binary) can otherwise inject `--pre` and make ripgrep execute an arbitrary
  * preprocessor for every matched file. The collect dispositions are the
  * seam's diagnostic-tail shape (no spill files): the tools never read a raw
@@ -206,9 +208,13 @@ export async function runRipgrep(
   const workdir = exec.agent === undefined
     ? process.cwd()
     : await ctx.workingDirectory.ensure(exec.agent, exec.signal)
+  const policyService = ctx.get('sandboxPolicy')
+  const policy = policyService?.resolve({ session: exec.agent?.session })
+  const lease = policy === undefined ? undefined : policyService?.leaseReadAccess(policy, exec.signal)
+  const signal = lease?.signal ?? exec.signal
   let handle: SubprocessHandle
   try {
-    handle = await spawnRipgrep(ctx.subprocess, {
+    const spec: SubprocessSpawnSpec = {
       argv,
       cwd: workdir,
       stdio: {
@@ -217,9 +223,20 @@ export async function runRipgrep(
         stderr: { maxBytes: stderrMaxBytes },
       },
       graceMs,
-      signal: exec.signal,
-    } satisfies SubprocessSpawnSpec)
+      signal,
+    }
+    if (policyService !== undefined && policy?.readAccess !== undefined && policy.mode !== 'danger-full-access') {
+      policyService.assertReadAccess(policy)
+      const sandbox = ctx.get('sandbox')
+      if (sandbox === undefined) throw new SearchError('Isolated file search requires process confinement', 'SEARCH_FAILED')
+      const confined = await sandbox.confine([await resolveRgPath(), '--no-config', ...argv], { ...policy, mode: policy.mode }, signal)
+      policyService.assertReadAccess(policy)
+      handle = ctx.subprocess.spawn({ ...spec, argv: confined.argv })
+    } else {
+      handle = await spawnRipgrep(ctx.subprocess, spec)
+    }
   } catch (error: unknown) {
+    lease?.dispose()
     // Node's spawn() throws synchronously for a NUL in argv, and the local
     // impl can throw synchronously when the signal aborts between the check
     // above and this call (or when the platform-package resolution rejects).
@@ -236,8 +253,9 @@ export async function runRipgrep(
     outcome = await handle.done
   } catch (error: unknown) {
     throw new SearchError(`${toolName} subprocess failed before reporting an outcome (ripgrep provider failure)`, 'SEARCH_FAILED', { cause: error })
-  }
+  } finally { lease?.dispose() }
   const stdout = handle.collected.stdout?.readFrom(0)
+  if (policy !== undefined) policyService?.assertReadAccess(policy)
   const stderr = handle.collected.stderr?.readFrom(0)
   if (stdout === undefined || stderr === undefined) {
     throw new SearchError(`${toolName} search command produced no collected output streams`, 'SEARCH_FAILED')
@@ -374,8 +392,12 @@ export async function trySaveFormattedResult(
     suggestedName,
     content,
   }
+  const policyService = ctx.get('sandboxPolicy')
+  const policy = policyService?.resolve({ session: exec.agent?.session })
   try {
-    return await spillStore.saveText(save)
+    const saved = await spillStore.saveText(save)
+    if (policyService !== undefined && policy?.readAccess !== undefined) policyService.registerReadArtifact(policy, saved.locator)
+    return saved
   } catch (error: unknown) {
     // Best-effort: a storage failure must never fail the search or hide the
     // inline result — the footer reports the unsaved remainder instead.

@@ -21,6 +21,8 @@ import type { GenerateOptions, LlmModelInfo, LlmResolvedModelInfo, StreamChunk }
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { RUN_CODE_NAME, defineTool } from '@deepseek-ai/dsh-tools'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
+import SandboxedFileSystem from '@deepseek-ai/dsh-fs-sandbox'
+import SandboxPolicy from '@deepseek-ai/dsh-sandbox-policy'
 import LocalAttachmentStore from '@deepseek-ai/dsh-attachment-local'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import OfficeKit, { OfficeKitError, type OfficeKitErrorCode, type OfficeImagesRequest, type OfficeImagesResult, type OfficeKitSource } from '@deepseek-ai/dsh-office-kit'
@@ -131,6 +133,7 @@ afterEach(async () => {
 })
 
 interface SetupOptions {
+  restrictReads?: boolean
   ptc?: boolean
   attachments?: boolean | { normalizedImageMaxPixels: number }
   llm?: boolean
@@ -148,7 +151,12 @@ async function setup(options: SetupOptions = {}) {
   if (options.ptc === true) await ctx.plugin(FakeRuntime)
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(AgentRegistry)
-  await ctx.plugin(LocalFileSystem, { cwd: dir })
+  if (options.restrictReads) {
+    await ctx.plugin(SandboxPolicy, { mode: 'workspace-write', workspaceRoot: dir })
+    await ctx.plugin(SandboxedFileSystem, { cwd: dir })
+  } else {
+    await ctx.plugin(LocalFileSystem, { cwd: dir })
+  }
   if (options.attachments !== false) {
     await ctx.plugin(LocalAttachmentStore, { dshHome: home, ...typeof options.attachments === 'object' ? options.attachments : {} })
   }
@@ -211,6 +219,53 @@ const invalidArgs = { name: 'ToolArgsError', code: 'INVALID_ARGS' }
 const officeToolError = (code: string) => ({ name: 'OfficeToolError', code })
 
 describe('office schema', () => {
+  it.skipIf(process.platform !== 'linux')('authorizes only the converted file from the trusted output store', async () => {
+    const { ctx, kit } = await setup({ restrictReads: true })
+    const owner = agentOn('vision')
+    ctx.sandboxPolicy.registerReadAccess(owner.session, { roots: [dir], policyId: 'office-output', epoch: 1 })
+    const output = join(home, 'outputs', 'report.pdf')
+    await mkdir(join(home, 'outputs'))
+    await writeFile(output, 'converted')
+    await writeFile(join(home, 'outputs', 'other.pdf'), 'other')
+    kit.convertTo.mockResolvedValueOnce({ path: output, bytes: 9, missingFonts: [] })
+    const result = await office(ctx, { operation: 'convert', input: 'report.docx', format: 'pdf' }, owner)
+    expect(result.isError).toBe(false)
+    const policy = ctx.sandboxPolicy.resolve({ session: owner.session })
+    expect(policy.readAccess?.artifacts?.map(file => file.path)).toEqual([output])
+    expect(await ctx.fs.readText(await ctx.fs.resolve(output, { sandboxPolicy: policy }))).toBe('converted')
+    await expect(ctx.fs.resolve(join(home, 'outputs', 'other.pdf'), { sandboxPolicy: policy })).rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
+  })
+
+  it.skipIf(process.platform !== 'linux')('rejects a conversion result after its read authority is revoked', async () => {
+    const { ctx, kit } = await setup({ restrictReads: true })
+    const owner = agentOn('vision')
+    const revoke = ctx.sandboxPolicy.registerReadAccess(owner.session, { roots: [dir], policyId: 'office-revoke', epoch: 1 })
+    kit.convertTo.mockImplementationOnce(async (request) => {
+      const result = await fileResult(request)
+      revoke()
+      return result
+    })
+    const result = await office(ctx, { operation: 'convert', input: 'report.docx', format: 'pdf' }, owner)
+    expect(result.error).toMatchObject({ info: { code: 'SANDBOX_READ_ACCESS_DENIED' } })
+    expect(kit.convertTo).toHaveBeenCalledOnce()
+  })
+
+  it('refuses unauthorized source paths before calling the converter', async () => {
+    const { ctx, kit } = await setup({ restrictReads: true })
+    const owner = agentOn('vision')
+    ctx.sandboxPolicy.registerReadAccess(owner.session, { roots: [], policyId: 'office', epoch: 1 })
+    for (const args of [
+      { operation: 'render', input: 'deck.pptx' },
+      { operation: 'convert', input: 'report.docx', format: 'pdf' },
+      { operation: 'recalculate', input: 'book.xlsx', format: 'xlsx' },
+    ]) {
+      expect((await office(ctx, args, owner)).error).toMatchObject({ info: { code: 'FS_SANDBOX_DENIED' } })
+    }
+    expect(kit.renderImages).not.toHaveBeenCalled()
+    expect(kit.convertTo).not.toHaveBeenCalled()
+    expect(kit.recalculate).not.toHaveBeenCalled()
+  })
+
   it('declares the model-facing description and parameters', async () => {
     const { ctx } = await setup()
     const schemas = ctx.tools.schemas()

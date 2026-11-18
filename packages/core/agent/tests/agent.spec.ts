@@ -302,6 +302,51 @@ describe('explicit cancellation contract', () => {
 })
 
 describe('AgentRegistry factory seam', () => {
+  it('prepares cwd before creation and removes the hook with its owner', async () => {
+    const ctx = new Context()
+    onTestFinished(() => ctx.fiber.dispose())
+    await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(AgentRegistry)
+    const { factory, calls } = stubFactory()
+    ctx.agents.setFactory(factory)
+    const hook = await ctx.plugin((scope: Context) => {
+      scope.on('agent/create', (request, next) => {
+        request.options = { ...request.options, meta: { ...request.options.meta, cwd: '/isolated' } }
+        return next()
+      })
+    })
+    const options = { sessionId: brandString<SessionId>('prepared'), meta: { cwd: '/original' } }
+    await ctx.agents.create(options)
+    expect(calls.create[0]?.options.meta?.cwd).toBe('/isolated')
+    expect(options.meta.cwd).toBe('/original')
+    await hook.dispose()
+    await ctx.agents.create(options)
+    expect(calls.create[1]?.options).toBe(options)
+  })
+
+  it('passes prepared options through ordered hooks and preserves vetoes', async () => {
+    const ctx = new Context()
+    onTestFinished(() => ctx.fiber.dispose())
+    await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(AgentRegistry)
+    const { factory, calls } = stubFactory()
+    ctx.agents.setFactory(factory)
+    ctx.on('agent/create', (request, next) => {
+      request.options = { ...request.options, meta: { ...request.options.meta, cwd: '/first' } }
+      return next()
+    })
+    ctx.on('agent/create', (request, next) => {
+      expect(request.options.meta?.cwd).toBe('/first')
+      request.options = { ...request.options, meta: { ...request.options.meta, cwd: '/second' } }
+      return next()
+    })
+    await ctx.agents.create({ sessionId: brandString<SessionId>('ordered') })
+    expect(calls.create[0]?.options.meta?.cwd).toBe('/second')
+    ctx.on('agent/create', async () => { throw new Error('creation refused') })
+    await expect(ctx.agents.create({ sessionId: brandString<SessionId>('vetoed') })).rejects.toThrow('creation refused')
+    expect(calls.create).toHaveLength(1)
+  })
+
   function stubFactory() {
     const calls: {
       create: Array<{ ownerCtx: Context; options: CreateAgentOptions }>

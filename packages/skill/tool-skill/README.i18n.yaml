@@ -3,8 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/skill/tool-skill/README.md
 /:
-  en: e1bb629bc25d7d51
-  zh: 0018e221e28ddcff
+  en: cb3f91d54eee30e5
+  zh: cb3f91d54eee30e5
+/description-the-model-facing-skill-catalog-and-loader-tool-for-users-and-maintainers-understanding-what-agents-see-or-configuring-the-session-skill-catalog-kind-package-reference:
+  en: 2f1d8a0345c1d7d7
+  zh: 4417e54dbdcc230d
 /deepseek-ai-dsh-tool-skill:
   en: 223816f8da89cf76
   zh: 7c54534f299141eb
@@ -12,8 +15,8 @@
   en: b4180d01149b73ff
   zh: 49da5065078a1407
 /deepseek-ai-dsh-tool-skill/table-of-contents:
-  en: d152484eb41ac6b4
-  zh: 09388d293f9be9cb
+  en: eb6ed279e78f8b65
+  zh: 5583226de8ecca29
 /deepseek-ai-dsh-tool-skill/use-this-package:
   en: 633cb494ab14a7ce
   zh: 8647ccca09bf3e0a
@@ -21,23 +24,26 @@
   en: b7d33bd969826ee3
   zh: 4e155a0f14b41541
 /deepseek-ai-dsh-tool-skill/use-this-package/mount-and-configure:
-  en: 440b17442e431e27
-  zh: f8e6d8ef9a954e86
+  en: e519083ed837b07e
+  zh: a7b95deeb2f9236a
 /deepseek-ai-dsh-tool-skill/use-this-package/what-the-model-gets:
-  en: 30977f5aac156d02
-  zh: 6641d32f1d6033ea
+  en: ca0f465f50615b1d
+  zh: 6df3b790edd09f0b
 /deepseek-ai-dsh-tool-skill/use-this-package/observable-success-and-failures:
   en: 22378da498c4a8db
   zh: 821d021a0fc1eff5
 /deepseek-ai-dsh-tool-skill/understand-the-implementation:
-  en: 1aa627255c35178f
-  zh: 44d8633ea56765d3
+  en: 57e15589824b2668
+  zh: 95f76747d673491d
+/deepseek-ai-dsh-tool-skill/understand-the-implementation/host-provided-access:
+  en: aedf63365131c695
+  zh: 4f6506e9c545f064
 /deepseek-ai-dsh-tool-skill/understand-the-implementation/design-concept:
   en: c1faafc87c5bea50
   zh: a0dc8d1f7365a139
 /deepseek-ai-dsh-tool-skill/understand-the-implementation/source-map:
-  en: 509699e3a467df41
-  zh: ff7fc30ec4998e5a
+  en: ea83be4b3207de7e
+  zh: 85163a15b153d056
 /deepseek-ai-dsh-tool-skill/understand-the-implementation/catalog-lifecycle:
   en: c5a79c840eec02dc
   zh: 724d52ed923b9285
@@ -45,8 +51,8 @@
   en: bb8543ea29cbc451
   zh: b1124fa489bf9ea4
 /deepseek-ai-dsh-tool-skill/further-exploration:
-  en: c4797732cde7d1f5
-  zh: daabfd858cceb271
+  en: b80a94d85288a808
+  zh: 86a6064cc7b1e13f
 /deepseek-ai-dsh-tool-skill/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -138,8 +144,8 @@
   en: 127c0139472bfaab
   zh: 805dc2f730c47f40
 /deepseek-ai-dsh-tool-skill/known-limitations-and-deferred-work:
-  en: 6017a1dc04618288
-  zh: d613164f0e9258f9
+  en: 914201a1f84195f4
+  zh: 4b42f35164468fb6
 /deepseek-ai-dsh-tool-skill/known-limitations-and-deferred-work/dev-note:
-  en: e67f633dc6fe7773
-  zh: 3bb0c20c93f16f98
+  en: 34651d247c0d1bba
+  zh: b8b78bf26d28e4d6

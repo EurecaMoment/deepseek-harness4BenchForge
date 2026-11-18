@@ -87,6 +87,10 @@ The `agent/*` events let plugins act on live work without depending on the loop 
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+### Host-provided access
+
+The `agent/create` waterfall prepares `CreateAgentOptions` before the factory creates the Session. Listeners replace `request.options`, then delegate with `next()`; caller ownership and factory rollback remain unchanged.
+
 This section explains how the package realizes the behavior above; the observable contract is covered in [Use this package](#use-this-package).
 
 ### Design concept

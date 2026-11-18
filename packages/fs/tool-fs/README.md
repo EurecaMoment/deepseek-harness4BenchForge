@@ -95,6 +95,10 @@ Failures are normalized as `Error: <message>` with a structured code preserved f
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+### Host-provided access
+
+Agent file calls carry their resolved [read authority](../../sandbox/sandbox-policy/README.md) into filesystem target resolution.
+
 This section explains the design decisions behind the tool suite and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
 
 ### Design concept

@@ -3,8 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/fs/fs-local/README.md
 /:
-  en: ce32f58ec51489e8
-  zh: d12c4665bd72e452
+  en: cb3f91d54eee30e5
+  zh: cb3f91d54eee30e5
+/description-the-host-filesystem-backend-for-ctx-fs-for-deployments-and-maintainers-choosing-or-debugging-local-file-access-kind-package-reference:
+  en: 27ddfbc51103d34e
+  zh: 42c42e26157989a4
 /deepseek-ai-dsh-fs-local:
   en: 4eb75bc6b409d069
   zh: 645121e948423a0f
@@ -12,8 +15,8 @@
   en: b49c5dee4d8ba64c
   zh: 87a7cbc265314ea8
 /deepseek-ai-dsh-fs-local/table-of-contents:
-  en: d152484eb41ac6b4
-  zh: 09388d293f9be9cb
+  en: eb6ed279e78f8b65
+  zh: 5583226de8ecca29
 /deepseek-ai-dsh-fs-local/use-this-package:
   en: c49313aeb4737eca
   zh: 7b80272bbf8404e3
@@ -21,20 +24,23 @@
   en: 1bceab0cdb2e8f8e
   zh: 7d14d0c1ad90e9e2
 /deepseek-ai-dsh-fs-local/use-this-package/minimal-configuration:
-  en: ca0cfe83eca367c0
-  zh: 9d3a6d61952f180e
+  en: 6ab7429e146c6ab1
+  zh: 3814c859c201c960
 /deepseek-ai-dsh-fs-local/use-this-package/what-you-can-do:
   en: 0f05ec25037a6d39
   zh: d67d80a04c148f3b
 /deepseek-ai-dsh-fs-local/understand-the-implementation:
-  en: 6ffc93e09381bd3d
-  zh: 57c3192c26a080ef
+  en: 57e15589824b2668
+  zh: 95f76747d673491d
+/deepseek-ai-dsh-fs-local/understand-the-implementation/host-provided-access:
+  en: dc5a23362ea396ad
+  zh: d9dfe97d8178585f
 /deepseek-ai-dsh-fs-local/understand-the-implementation/design-concept:
-  en: 197876fc5f05cdc3
-  zh: a6e7a9eb921d394b
+  en: 8e457eaa1cc3f45c
+  zh: d94cd007032fe1ea
 /deepseek-ai-dsh-fs-local/understand-the-implementation/source-map:
-  en: e69aa171af80b6b4
-  zh: 5ebf652092c70aad
+  en: 6c21102aca29699e
+  zh: 95677c5af8d8eea9
 /deepseek-ai-dsh-fs-local/understand-the-implementation/write-path:
   en: eefa5c3b69af4614
   zh: d5ac6b2e14efe268
@@ -45,8 +51,8 @@
   en: f094e3ea30517cb4
   zh: b213bb41b7a0201d
 /deepseek-ai-dsh-fs-local/further-exploration:
-  en: 876ca2a87a361f41
-  zh: d2855979b1d2bda9
+  en: 407810a7dc6f7a8c
+  zh: 2d918d60ee94e464
 /deepseek-ai-dsh-fs-local/model-experience:
   en: 72536bc0452cccaa
   zh: 298f94b78e8364f4
@@ -54,8 +60,8 @@
   en: 40294c1c31b74824
   zh: 0857e9b4dd363e0a
 /deepseek-ai-dsh-fs-local/known-limitations-and-deferred-work:
-  en: 653e3d81d6a5f82d
-  zh: 633f47afeb0da9ba
+  en: ab01edbe48ca2b2a
+  zh: 04893cdef0a52b1a
 /deepseek-ai-dsh-fs-local/known-limitations-and-deferred-work/dev-note:
-  en: e67f633dc6fe7773
-  zh: 3bb0c20c93f16f98
+  en: 34651d247c0d1bba
+  zh: b8b78bf26d28e4d6

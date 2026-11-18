@@ -53,6 +53,10 @@ The file-count limit is validated at mount. The tool requires an agent Session w
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+### Host-provided access
+
+File inputs resolve the calling Session's sandbox policy before metadata and content access, including explicit read roots and authority generations. Calls without a read registration retain their existing behavior.
+
 The tool resolves paths through the configured filesystem provider and checks regular-file metadata without reading contents. Successful final `tools/result` notifications append `deliverables/presented`, including nested calls. A later enclosing program failure does not revoke an already completed declaration. Blocked results publish none. Each plugin instance records only calls it executed; scoped tools with the same name cannot publish through another instance.
 
 The pure `./types` entry declares `PresentedFile` and the Session event without importing Host runtime code. The Web consumer validates persisted declarations before displaying or opening them. New declarations store absolute paths. Legacy relative declarations retain the viewed Session's original workspace as their base.

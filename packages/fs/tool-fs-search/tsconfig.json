@@ -46,6 +46,12 @@
     },
     {
       "path": "../../util/ripgrep"
+    },
+    {
+      "path": "../../sandbox/sandbox"
+    },
+    {
+      "path": "../../sandbox/sandbox-policy"
     }
   ]
 }

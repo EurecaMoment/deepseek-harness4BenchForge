@@ -88,6 +88,14 @@ Search failures carry the package-owned codes `SEARCH_INVALID_PATTERN` (ripgrep 
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+### Host-provided access
+
+Searches with explicit read grants run packaged ripgrep through `ctx.sandbox` and reject expired results. The Host must grant the packaged executable and its runtime libraries; unavailable confinement fails closed. Calls without read grants preserve direct subprocess execution.
+
+In-flight commands and search processes lease their read authority until settlement. An authority generation change cancels those processes; settled listeners are released. Calls without read grants keep their original cancellation signal.
+
+Trusted service outputs may add exact physical file grants within the current authority generation. These grants record device and inode, expose no parent directory, and disappear when the generation changes. File reads and process mounts reject replacement inodes; this is a Host/service API, never a model-supplied permission request.
+
 This section explains the design decisions behind the search tools and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
 
 ### Design concept

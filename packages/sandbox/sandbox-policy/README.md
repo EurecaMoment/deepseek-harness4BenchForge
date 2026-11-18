@@ -74,6 +74,14 @@ An invalid configured mode is rejected when the plugin loads, so a typo fails lo
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+### Host-provided access
+
+Trusted hosts may register `readAccess` with `registerReadAccess(session, { roots, policyId, epoch })`. Roots name existing physical files or directories and include the workspace plus explicit interpreter/runtime dependencies. The same identity requires a newer generation for every update; disposal publishes a deny-all generation. Resolved file targets and process starts reject expired generations. PTY and PTC owners close old processes before admitting new work. Omission retains the existing read behavior; `danger-full-access` bypasses read confinement. Grants are runtime-only and the Host must reauthorize resumed Sessions.
+
+In-flight commands and search processes lease their read authority until settlement. An authority generation change cancels those processes; settled listeners are released. Calls without read grants keep their original cancellation signal.
+
+Trusted service outputs may add exact physical file grants within the current authority generation. These grants record device and inode, expose no parent directory, and disappear when the generation changes. File reads and process mounts reject replacement inodes; this is a Host/service API, never a model-supplied permission request.
+
 This section explains policy resolution, the per-session store, and the model-visible contribution; the observable behavior is fully covered in [Use this package](#use-this-package).
 
 ### Resolution precedence

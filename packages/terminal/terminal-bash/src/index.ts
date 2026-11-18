@@ -108,7 +108,10 @@ async function spawnArgv(ctx: Context, config: ResolvedConfig, policy: SandboxEx
     throw new TerminalError(`terminal-bash: sandbox mode "${policy.mode}" requires a ctx.sandbox provider in the execution world`, 'NO_SANDBOX')
   }
   // Re-state the discriminant because object spread does not preserve its narrowed type.
-  return (await sandbox.confine(argv, { ...policy, mode: policy.mode }, signal)).argv
+  const command = policy.readAccess !== undefined && config.shellDialect === 'bash'
+    ? ['env', `PS1=${CONTROLLED_PROMPT}`, `PROMPT_COMMAND=printf "\\033]133;D;%s\\007" "$?"; PS1='${CONTROLLED_PROMPT}'`, ...argv]
+    : argv
+  return (await sandbox.confine(command, { ...policy, mode: policy.mode }, signal)).argv
 }
 
 // TODO(pty-initialize-race-home): Fold this outer abort race into
@@ -206,6 +209,7 @@ export class BashTerminalBackend implements TerminalBackend {
     ensureSandboxModeFence(this.ctx, spec.owner)
     const policy = this.ctx.sandboxPolicy.resolve({ session: spec.owner.session })
     const argv = await spawnArgv(this.ctx, this.config, policy, spec.signal)
+    this.ctx.sandboxPolicy.assertReadAccess(policy)
     spec.signal?.throwIfAborted()
     if (argv[0] === undefined) throw new SubprocessError('terminal-bash: sandbox returned empty argv', 'SUBPROCESS_INVALID_ARGV')
     const terminal = await this.spawnTerminal({

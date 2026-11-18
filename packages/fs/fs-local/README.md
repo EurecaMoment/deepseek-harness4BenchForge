@@ -66,6 +66,10 @@ Chokidar observes one file or a directory's direct entries through OS events, wi
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+### Host-provided access
+
+Stricter filesystem providers may override `prepareMutationTarget` to pin a parent descriptor while the logical target lock is held. `LocalMutationLease` owns descriptor cleanup; optional no-follow I/O rejects linked edit/diff sources and pins staging directories. The local backend supplies an identity lease, preserving ordinary symlink and mutation semantics.
+
 This section explains the design decisions behind the local backend and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
 
 ### Design concept

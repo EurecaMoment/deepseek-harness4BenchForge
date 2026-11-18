@@ -1706,7 +1706,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         throws: ['when the provider does not support watching or cannot initialize the watcher.'],
       },
       {
-        signature: 'abstract resolve(path: string, opts?: { cwd?: string; signal?: AbortSignal }): Promise<FsTarget>',
+        signature: 'abstract resolve(path: string, opts?: { cwd?: string; signal?: AbortSignal; sandboxPolicy?: SandboxExecutionPolicy }): Promise<FsTarget>',
         description: 'Resolve a model/plugin-supplied path into a stable FsTarget. May perform I/O (a remote/sandboxed backend may need a round-trip to map a path to a stable identity), hence async even though the local backend only normalizes + realpaths.',
         parameters: [{ name: 'path', description: 'the path to resolve; relative paths resolve against `opts.cwd`.' }, { name: 'opts', description: 'optional cwd override and cancellation signal.' }],
         returns: 'the stable target; the same file yields the same `targetKey`.',
@@ -1742,7 +1742,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'metadata only, never content; undefined for an absent target.',
       },
       {
-        signature: 'abstract lstat(path: string, opts?: { cwd?: string }, signal?: AbortSignal): Promise<FsPathInfo | undefined>',
+        signature: 'abstract lstat( path: string, opts?: { cwd?: string; sandboxPolicy?: SandboxExecutionPolicy }, signal?: AbortSignal, ): Promise<FsPathInfo | undefined>',
         description: 'Return path metadata without following the final path component when it is a symbolic link. This is intentionally path-shaped, not target-shaped: resolve follows symlinks to produce the stable identity used by normal reads/writes, while `lstat` lets a consumer reject the path itself before that follow happens.\n\n`opts.cwd` follows resolve\'s cwd rules. `undefined` means the path is absent.',
         parameters: [{ name: 'path', description: 'the path to inspect; relative paths resolve against `opts.cwd`.' }, { name: 'opts', description: '`cwd` overrides the backend\'s default base for relative paths.' }, { name: 'signal', description: 'aborts the metadata round-trip.' }],
         returns: 'metadata only, never content; undefined for an absent path.',
@@ -2851,6 +2851,29 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'request', description: 'optional session and approved mode override.' }],
         returns: 'the fully resolved per-call mode and absolute workspace root.',
         throws: ['`SandboxInvalidRootError` (`SANDBOX_INVALID_ROOT`) when the session\'s recorded cwd is relative or contains a NUL byte.'],
+      },
+      {
+        signature: 'registerReadAccess(session: Session, access: SandboxReadAccess): () => void',
+        description: 'Register read roots; disposal retains a deny-all generation until reauthorized.',
+        parameters: [{ name: 'session', description: 'exact Session whose future operations receive these grants.' }, { name: 'access', description: 'trusted identity, monotonically increasing generation, and absolute roots.' }],
+        returns: 'the owning Cordis effect disposer; stale disposers do not revoke newer grants.',
+      },
+      {
+        signature: 'assertReadAccess(policy: SandboxExecutionPolicy): void',
+        description: 'Refuse a target or process snapshot resolved before its authority changed.',
+        parameters: [{ name: 'policy', description: 'resolved execution authority; unrestricted calls require no read registration.' }],
+      },
+      {
+        signature: 'leaseReadAccess(policy: SandboxExecutionPolicy, signal?: AbortSignal): { signal: AbortSignal; dispose: () => void }',
+        description: 'Cancel an in-flight operation when its registered read authority changes.',
+        parameters: [{ name: 'policy', description: 'execution snapshot checked before the listener is installed.' }, { name: 'signal', description: 'optional caller cancellation, combined with revocation.' }],
+        returns: 'cancellation signal and a disposer to release when execution settles.',
+      },
+      {
+        signature: 'registerReadArtifact(policy: SandboxExecutionPolicy, path: string): string',
+        description: 'Grant one file produced by a trusted service under the current read generation.',
+        parameters: [{ name: 'policy', description: 'owner snapshot captured before the service produced the file.' }, { name: 'path', description: 'service-owned physical output filename, never model-supplied input.' }],
+        returns: 'the physical path; future resolutions include only this file\'s inode.',
       },
       {
         signature: 'registerWritableRoot(session: Session, directory: string): () => void',
@@ -5079,6 +5102,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'payload', description: '.frame - one ordered start, chunk, or end publication. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.' }],
   },
   {
+    name: 'agent/create',
+    mode: 'waterfall',
+    signature: '\'agent/create\'(request: AgentCreationRequest, next: () => Promise<AgentHandle>): Promise<AgentHandle>',
+    summary: 'Prepare creation metadata before the Session or Agent exists.',
+    description: 'Prepare creation metadata before the Session or Agent exists.',
+    parameters: [{ name: 'request', description: 'mutable creation envelope; replace its options before calling next.' }, { name: 'next', description: 'continue with the current envelope, preserving caller ownership.' }],
+  },
+  {
     name: 'agent/created',
     mode: 'serial',
     signature: '\'agent/created\'(this: Scoped<Agent>, payload: { agent: Agent; source: SessionStartSource; signal?: AbortSignal }): undefined | Promise<undefined>',
@@ -5527,6 +5558,22 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [],
   },
   {
+    name: 'sandbox/read-access-changed',
+    mode: 'emit',
+    signature: '\'sandbox/read-access-changed\'(session: Session, access: SandboxReadAccess): void',
+    summary: 'Revoke stale in-flight operations after committing new authority.',
+    description: 'Revoke stale in-flight operations after committing new authority.',
+    parameters: [{ name: 'session', description: 'authority owner.' }, { name: 'access', description: 'committed read grants.' }],
+  },
+  {
+    name: 'sandbox/read-access-changing',
+    mode: 'emit',
+    signature: '\'sandbox/read-access-changing\'(session: Session, access: SandboxReadAccess): void',
+    summary: 'Announce a proposed authority change before committing it.',
+    description: 'Announce a proposed authority change before committing it.',
+    parameters: [{ name: 'session', description: 'authority owner.' }, { name: 'access', description: 'proposed read grants.' }],
+  },
+  {
     name: 'schedule/changed',
     mode: 'emit',
     signature: '\'schedule/changed\'(): void',
@@ -5965,6 +6012,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'AgentCancelCause',
     declaration: 'export type AgentCancelCause = {\n    readonly kind: \'user\';\n} | {\n    readonly kind: \'parent\';\n} | {\n    readonly kind: \'hook\';\n    readonly reason: string;\n} | {\n    readonly kind: \'disposed\';\n};',
+  },
+  {
+    name: 'AgentCreationRequest',
+    declaration: 'export interface AgentCreationRequest {\n    options: CreateAgentOptions;\n}',
   },
   {
     name: 'AgentFactory',
@@ -7204,7 +7255,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'FsTarget',
-    declaration: 'export interface FsTarget {\n    targetKey: FsTargetKey;\n    displayPath: string;\n}',
+    declaration: 'export interface FsTarget {\n    targetKey: FsTargetKey;\n    displayPath: string;\n    sandboxPolicy?: SandboxExecutionPolicy;\n}',
   },
   {
     name: 'FsTargetKey',
@@ -8752,7 +8803,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SandboxExecutionPolicy',
-    declaration: 'export interface SandboxExecutionPolicy {\n    mode: SandboxMode;\n    workspaceRoot: string;\n    additionalWritableRoots?: readonly string[];\n    sessionId?: SessionId;\n}',
+    declaration: 'export interface SandboxExecutionPolicy {\n    mode: SandboxMode;\n    workspaceRoot: string;\n    additionalWritableRoots?: readonly string[];\n    sessionId?: SessionId;\n    readAccess?: SandboxReadAccess;\n}',
   },
   {
     name: 'SandboxMode',
@@ -8764,7 +8815,15 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SandboxPolicyRequest',
-    declaration: 'export interface SandboxPolicyRequest {\n    session?: Session;\n    mode?: SandboxMode;\n}',
+    declaration: 'export interface SandboxPolicyRequest {\n    session?: Session | undefined;\n    mode?: SandboxMode;\n}',
+  },
+  {
+    name: 'SandboxReadAccess',
+    declaration: 'export interface SandboxReadAccess {\n    readonly roots: readonly string[];\n    readonly policyId: string;\n    readonly epoch: number;\n    readonly artifacts?: readonly SandboxReadArtifact[];\n}',
+  },
+  {
+    name: 'SandboxReadArtifact',
+    declaration: 'export interface SandboxReadArtifact {\n    readonly path: string;\n    readonly device: string;\n    readonly inode: string;\n}',
   },
   {
     name: 'SaveFileAttachment',
@@ -9752,7 +9811,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SkillLookupOptions',
-    declaration: 'export interface SkillLookupOptions {\n    readonly cwd?: string | undefined;\n    readonly signal?: AbortSignal | undefined;\n}',
+    declaration: 'export interface SkillLookupOptions {\n    readonly trustedSourcesOnly?: boolean | undefined;\n    readonly cwd?: string | undefined;\n    readonly signal?: AbortSignal | undefined;\n}',
   },
   {
     name: 'SkillProvider',

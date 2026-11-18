@@ -144,7 +144,8 @@ export class SessionCommandController {
       this.rejectCreation(error)
     }
     const sessionId = created.agent.id
-    if (workspace !== undefined) {
+    if (workspace !== undefined
+      && (created.agent.session.header.cwd === undefined || created.agent.session.header.cwd === workspace.path)) {
       try {
         await workspace.attachSession(sessionId)
       } catch (error) {
@@ -297,7 +298,8 @@ export class SessionCommandController {
         {},
       )
     }
-    if (workspace !== undefined) {
+    const childCwd = this.ctx.agents.get(childId)?.session.header.cwd
+    if (workspace !== undefined && (childCwd === undefined || childCwd === workspace.path)) {
       try {
         await workspace.attachSession(childId)
       } catch (error) {

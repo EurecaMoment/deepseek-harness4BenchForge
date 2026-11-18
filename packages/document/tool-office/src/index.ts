@@ -23,6 +23,8 @@ import { OfficeKitError, type OfficeDocumentExtension, type OfficeImageInputExte
   type OfficeKitSource, type OfficeWorkbookExtension } from '@deepseek-ai/dsh-office-kit'
 import { defineTool, ToolContextUnavailableError, type ToolActivationContext, type ToolExecution } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-working-directory'
+import type {} from '@deepseek-ai/dsh-sandbox-policy'
+import type { SandboxExecutionPolicy } from '@deepseek-ai/dsh-sandbox'
 import { checkParameterNames, checkRenderArguments, checkConversionArguments, extensionOf, inputFamily, OUTPUT_FORMATS,
   RECALCULATION_FORMATS,
   type OfficeRenderArgs, type OfficeConvertArgs, type OfficeRecalculateArgs, type OfficeFamily, type OfficeOperationName,
@@ -236,7 +238,10 @@ async function prepareInput(ctx: Context, exec: ToolExecution, operation: Office
     throw officeFailure(operation, input, new OfficeKitError('unavailable', 'The document converter is unavailable.'))
   }
   const cwd = await ctx.workingDirectory.ensure(agent, signal)
-  const { target, info } = await readableInput(ctx, input, { cwd, signal })
+  const sandboxPolicy = ctx.get('sandboxPolicy')?.resolve({ session: agent.session })
+  const { target, info } = await readableInput(ctx, input, {
+    cwd, signal, ...sandboxPolicy === undefined ? {} : { sandboxPolicy },
+  })
   try {
     await authorizeContent(ctx, target, info, signal)
   } catch (error) { throw officeFailure(operation, target.displayPath, error) }
@@ -245,7 +250,7 @@ async function prepareInput(ctx: Context, exec: ToolExecution, operation: Office
 
 /** Resolve an input through the filesystem backend and require a regular file. */
 async function readableInput(
-  ctx: Context, path: string, options: { cwd: string; signal: AbortSignal },
+  ctx: Context, path: string, options: { cwd: string; signal: AbortSignal; sandboxPolicy?: SandboxExecutionPolicy },
 ): Promise<{ target: FsTarget; info: FsInfo }> {
   const target = await ctx.fs.resolve(path, options)
   const info = await ctx.fs.stat(target, options.signal)
@@ -304,6 +309,18 @@ function officeFailure(verb: string, path: string, error: unknown): unknown {
   return new OfficeToolError(`cannot ${verb} "${path}": ${error.message}${hint}`, OFFICE_KIT_FAILURE_CODES[error.code], { cause: error })
 }
 
+/** Recheck explicit authority before returning a deferred or cached conversion. */
+function assertReadAuthority(ctx: Context, target: FsTarget): void {
+  if (target.sandboxPolicy?.readAccess !== undefined) readAuthorityService(ctx).assertReadAccess(target.sandboxPolicy)
+}
+
+/** Require the optional policy service only for a target carrying explicit read authority. */
+function readAuthorityService(ctx: Context): Context['sandboxPolicy'] {
+  const service = ctx.get('sandboxPolicy')
+  if (service === undefined) throw new ToolContextUnavailableError('The read authority service is unavailable.')
+  return service
+}
+
 /**
  * Require the calling model route to declare image input. The route is the Session's latest request header
  * configuration, falling back to the agent options; a model whose capability is unknown is refused.
@@ -349,6 +366,7 @@ async function render(
       maxBytes: Math.min(config.maxImageBytes, limits.maxMessageImageBytes),
     }, signal)
   } catch (error) { throw officeFailure('render', target.displayPath, error) }
+  assertReadAuthority(ctx, target)
   const oversized = result.images.find(image => image.png.byteLength > limits.maxImageBytes)
   if (oversized !== undefined) {
     throw new OfficeToolError(`cannot render "${target.displayPath}": an image exceeds the ${limits.maxImageBytes}-byte image limit; select a smaller range or a lower dpi`, 'OFFICE_OUTPUT_TOO_LARGE')
@@ -363,6 +381,7 @@ async function render(
     if (!attachments.isAttachmentError(error)) throw error
     throw new AttachmentError(`cannot render "${target.displayPath}": ${error.message}`, error.code, { cause: error })
   }
+  assertReadAuthority(ctx, target)
   return {
     operation: 'render', path, pageCount: result.pageCount, dpi: result.dpi, missingFonts: result.missingFonts,
     images: result.images.map((image, index) => {
@@ -428,6 +447,8 @@ async function convertFile<Operation extends 'convert' | 'recalculate'>(
         source, output,
       }, signal)
   } catch (error) { throw officeFailure(operation, target.displayPath, error) }
+  assertReadAuthority(ctx, target)
+  if (target.sandboxPolicy?.readAccess !== undefined) readAuthorityService(ctx).registerReadArtifact(target.sandboxPolicy, result.path)
   return {
     operation, path: ctx.fs.processPath(target),
     // The output directory check above established that this execution world reads Host files.

@@ -63,6 +63,10 @@ A successful open returns the session id, type, pid when the backend has one, st
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+### Host-provided access
+
+Read-authority changes invalidate the owner’s existing PTYs, reject new sends during cleanup, and await closure before admitting another terminal.
+
 This section explains the design behind the service and points at the code that realizes it; the observable behavior is covered in [Use this package](#use-this-package).
 
 ### Design concept

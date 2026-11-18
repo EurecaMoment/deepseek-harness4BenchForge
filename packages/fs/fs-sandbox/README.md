@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-fs-sandbox` confines model file writes, edits, patches, deletions, and moves according to each session's sandbox mode while preserving the local filesystem's read behavior. In `read-only`, it rejects every mutation; in `workspace-write`, it permits targets only inside the session workspace or a platform temporary root; in `danger-full-access`, it does not restrict mutations. Use it instead of `fs-local` with `ctx.sandboxPolicy` when sessions need workspace-confined file changes. Denied operations return `FS_SANDBOX_DENIED`, which filesystem tools present with the active mode and a same-turn escalation hint.
+`dsh-fs-sandbox` confines model file writes, edits, patches, deletions, and moves according to each session's sandbox mode while preserving the local filesystem's read behavior when no explicit read authority is registered. In `read-only`, it rejects every mutation; in `workspace-write`, it permits targets only inside the session workspace or a platform temporary root; in `danger-full-access`, it does not restrict mutations. Use it instead of `fs-local` with `ctx.sandboxPolicy` when sessions need workspace-confined file changes. Denied operations return `FS_SANDBOX_DENIED`, which filesystem tools present with the active mode and a same-turn escalation hint.
 
 ## Table of Contents
 
@@ -27,7 +27,7 @@ English | [中文](README.zh.md)
 
 The fence covers `writeText`, `editText`, `patchText`, `deleteFile`, and `moveFile`. A move checks both source and destination before either effect, so a denied path leaves both files untouched.
 
-Mount this backend instead of `fs-local` when the model's file writes and edits must be confined by the session's sandbox mode, while reads stay unconfined. The fence applies per call: the tool layer resolves the calling session's mode and workspace root into the same policy the bash runner receives, so the filesystem and shell families never confine to different roots.
+Mount this backend instead of `fs-local` when the model's file writes and edits must be confined by the session's sandbox mode, and optionally register read authority to confine reads. The fence applies per call: the tool layer resolves the calling session's mode and workspace root into the same policy the bash runner receives, so the filesystem and shell families never confine to different roots.
 
 ### Minimal composition
 
@@ -49,7 +49,7 @@ The effective mode comes from the calling session's override or escalation grant
 
 ### Observable success and failures
 
-Reads, listings, metadata, and read-only watches work exactly as with `fs-local`; the mutation fence does not restrict observation. A denied mutation returns an `FS_SANDBOX_DENIED` error carrying the effective mode; through the tools the model sees `[sandbox: file access denied under <mode> mode]` plus the one-approved-wider retry hint, identical to bash's denials. A session with an approved escalation may retry the same operation at a strictly wider mode for that one call.
+Without `readAccess`, reads, listings, metadata, and read-only watches work as with `fs-local`. Explicit read authority confines file reads and metadata; file watching fails closed until a descriptor-safe watcher is available. A denied mutation returns an `FS_SANDBOX_DENIED` error carrying the effective mode; through the tools the model sees `[sandbox: file access denied under <mode> mode]` plus the one-approved-wider retry hint, identical to bash's denials. A session with an approved escalation may retry the same operation at a strictly wider mode for that one call.
 
 -----
 
@@ -59,11 +59,15 @@ Reads, listings, metadata, and read-only watches work exactly as with `fs-local`
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+### Host-provided access
+
+With explicit `readAccess`, Linux file reads, metadata, and directory listings enforce physical roots without following symlink components; stale generations fail. Strict mutations use workspace-owned roots and descriptor-pinned parents. Edit and diff reads refuse final-component symlinks; staging writes and final rename/unlink use pinned directories. Logical-path locks preserve version-guard serialization, and read authority revocation cancels pre-publication work. [Read authority](../../sandbox/sandbox-policy/README.md) is optional; ordinary calls retain their prior behavior.
+
 This section explains the design decisions behind the sandbox backend and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
 
 ### Design concept
 
-The fence is a policy check in trusted code over a model-controlled path — not a kernel boundary. The operations are the seam's own (open, rename); only the target path is untrusted, so canonicalize-then-contain is the complete answer to this surface. Kernel-grade isolation of untrusted code stays `ctx.shell`'s job.
+The fence is a policy check in trusted code over a model-controlled path — not a kernel boundary. The operations are the seam's own (open, rename); write containment canonicalizes and rechecks the target path. Explicit read authority uses descriptor-relative, no-follow traversal to avoid ancestor symlink swaps. Kernel-grade isolation of untrusted code stays `ctx.shell`'s job.
 
 ### Source map
 
@@ -78,7 +82,7 @@ Each mutation resolves the per-call policy (`danger-full-access` returns the cal
 
 ### Threat model
 
-The residual resolve-to-syscall TOCTOU is narrowed by re-canonicalizing immediately before the write and is accepted for this threat model; a kernel-tight boundary would need `openat2`-class primitives whose portability cost is not worth it here. A denial is a structured `FsError`, not stderr inference — an in-process fence knows exactly what it refused.
+Without read authority, the legacy canonical-path write fence retains its resolve-to-syscall race limitation. With explicit read authority, Linux mutations pin parent descriptors and use no-follow reads and pinned staging directories. A denial is a structured `FsError`, not stderr inference — an in-process fence knows exactly what it refused.
 
 </details>
 
@@ -122,7 +126,7 @@ A standing-policy change appends an owner-rendered superseding runtime-context s
 
 These limits define when the sandbox backend is a poor fit or needs special operational care. They are current package constraints, not a general sandbox comparison or a task backlog.
 
-- **A policy fence, not a kernel boundary** — the check is trusted code over a model-controlled path, so the residual resolve-to-syscall TOCTOU is narrowed (by the in-place re-canonicalization) but not eliminated; adversarial host processes are out of scope. Kernel-grade isolation of untrusted code stays `ctx.shell`'s.
+- **Authority scope** — legacy policies retain canonical-path write checks. Explicit Linux read authority uses descriptor-pinned reads and mutations; it does not isolate arbitrary trusted Host plugins or other privileged host processes. Untrusted commands use `ctx.shell` confinement.
 - **Fence-vs-runner parity is derived from one owner** — the writable set comes from `writableRoots`, shared with the Seatbelt profile; a runner profile that defines its writable set elsewhere would drift.
 - **Requires `ctx.sandboxPolicy`** — tools use it to resolve each session policy and the backend uses it for agentless-call fallbacks; the backend does not confine without it composed.
 

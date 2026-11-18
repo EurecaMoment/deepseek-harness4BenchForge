@@ -342,6 +342,9 @@ export class LocalSandboxProvider extends SandboxProvider {
    */
   async confine(argv: readonly string[], policy: SandboxPolicy, signal?: AbortSignal): Promise<ConfinedArgv> {
     signal?.throwIfAborted()
+    if (policy.readAccess !== undefined && canonicalPath(policy.workspaceRoot) !== policy.workspaceRoot) {
+      throw new SandboxUnavailableError(policy.mode)
+    }
     policy = { ...policy, workspaceRoot: canonicalPath(policy.workspaceRoot) }
     if (this.runnerCommand !== undefined) {
       return Promise.resolve<ConfinedArgv>({
@@ -352,6 +355,9 @@ export class LocalSandboxProvider extends SandboxProvider {
       })
     }
     const selected = this.selectRunner(policy.mode)
+    if (policy.readAccess !== undefined && selected.runner !== 'bwrap') {
+      throw new SandboxUnavailableError(policy.mode)
+    }
     const runnerArgv = this.runnerArgv(selected.runner, policy)
     return Promise.resolve<ConfinedArgv>({
       argv: [...runnerArgv, '--', ...argv],

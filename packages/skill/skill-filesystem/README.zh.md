@@ -92,6 +92,10 @@ skill 可以是被扫描根目录顶层的目录 bundle `<name>/SKILL.md`，也�
 <details>
 <summary>实现细节——点击展开</summary>
 
+### Host 提供的访问权限
+
+`trustedSourcesOnly` 查询仅发现明确的自定义和随包根目录，加载时也拒绝项目及用户候选项。
+
 本节解释发现与监视如何组织；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
 ### 设计理念
