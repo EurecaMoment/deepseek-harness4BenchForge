@@ -311,6 +311,76 @@ async function compactIfNeeded(
   return compact.compactIfNeeded(agent(session, model), trigger, SIGNAL)
 }
 
+describe('proactive compaction convergence', () => {
+  it('does not retry unchanged rejected input when only recent retained messages grow', async () => {
+    const compact = service({ thresholdRatio: 0.2, retainTokens: 160, compactionRetries: 0 })
+    compact.summary = [{ type: 'text', text: 'oversized '.repeat(1000) }]
+    const session = conversation(4)
+    await expect(compactIfNeeded(compact, session)).rejects.toThrow(/summary is not smaller/)
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'continue' }], source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    for (let check = 0; check < 12; check += 1) {
+      await expect(compactIfNeeded(compact, session)).resolves.toBeNull()
+    }
+    expect(compact.calls).toHaveLength(1)
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'new history '.repeat(120) }], source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    await expect(compactIfNeeded(compact, session)).rejects.toThrow(/summary is not smaller/)
+    expect(compact.calls).toHaveLength(2)
+  })
+
+  it('paces request failures and permits a later retry without weakening overflow recovery', async () => {
+    const compact = service({ thresholdRatio: 0.2, retainTokens: 120, failureRetrySteps: 2 })
+    const session = conversation(4)
+    compact.error = new Error('provider temporarily unavailable')
+    await expect(compactIfNeeded(compact, session)).rejects.toThrow('provider temporarily unavailable')
+    await expect(compactIfNeeded(compact, session)).resolves.toBeNull()
+    await expect(compactIfNeeded(compact, session)).resolves.toBeNull()
+    await expect(compactIfNeeded(compact, session)).rejects.toThrow('provider temporarily unavailable')
+    expect(compact.calls).toHaveLength(2)
+    compact.error = undefined
+    await expect(compactIfNeeded(compact, session, 'context-overflow')).resolves.not.toBeNull()
+    expect(compact.calls).toHaveLength(3)
+  })
+
+  it('keeps the original history when a summary saves less than the configured minimum', async () => {
+    const ctx = createContext()
+    const compact = service({ thresholdRatio: 0.2, retainTokens: 120, minReductionRatio: 0.9 }, ctx)
+    const session = conversation(4)
+    compact.summary = [{ type: 'text', text: 'summary '.repeat(120) }]
+    const nodes = [...session.surface.nodes]
+    await expect(compactIfNeeded(compact, session)).rejects.toThrow(/minimum pressure reduction/)
+    expect(session.surface.nodes).toEqual(nodes)
+    await expect(compactIfNeeded(compact, session)).resolves.toBeNull()
+    await expect(compactIfNeeded(compact, session, 'context-overflow')).resolves.not.toBeNull()
+  })
+
+  it('skips a checkpoint-only pressure range after restoring the Session', async () => {
+    const ctx = createContext()
+    const compact = service({ thresholdRatio: 0.2, retainTokens: 160 }, ctx)
+    const session = conversation(4)
+    const measured = ctx.tokenMeter.measure(session)
+    const range = selectCompactableRange(session, measured, 160)!
+    await compact.compactRegion(range.start, range.end, agent(session, MODEL), SIGNAL)
+    const projectionCheckpoint = ctx.sessionProjections.checkpoint(session)
+    expect(projectionCheckpoint['compactionPressureCheckpoint']).toMatchObject({ ver: 1, val: session.surface.nodes[0] })
+    const restored = Session.create(session.id, session.snapshotEvents())
+    const fresh = service({ thresholdRatio: 0.2, retainTokens: 160 }, createContext())
+    await expect(compactIfNeeded(fresh, restored)).resolves.toBeNull()
+    expect(fresh.calls).toHaveLength(0)
+    await expect(compactIfNeeded(fresh, restored, 'context-overflow')).resolves.not.toBeNull()
+    expect(fresh.calls).toHaveLength(1)
+  })
+
+  it.each([{ minReductionRatio: 0 }, { minReductionRatio: 1.1 }, { failureRetrySteps: -1 }, { failureRetrySteps: 0.5 }])(
+    'rejects invalid convergence policy %j', (config) => {
+      expect(() => resolveConfig(config)).toThrow()
+    },
+  )
+})
+
 describe('compact configuration and defaults', () => {
   it('uses low-friction service-wide defaults', () => {
     const resolved = resolveConfig({})
@@ -323,6 +393,8 @@ describe('compact configuration and defaults', () => {
       summarizationModel: '',
       maxTokens: 65_536,
       compactionRetries: 1,
+      minReductionRatio: 0.1,
+      failureRetrySteps: 8,
       maxOverflowRetries: 1,
       modelPolicies: [],
       auto: true,
@@ -854,15 +926,17 @@ describe('pressure measurement and retention', () => {
     expect(await compactIfNeeded(compact, retained)).toBeNull()
   })
 
-  it('uses one unified measurement for each pressure-and-retention decision', async () => {
+  it('uses the unified meter for pressure selection and transaction preparation', async () => {
     const ctx = createContext()
     const compact = service(compactConfig, ctx)
     const measure = vi.spyOn(ctx.tokenMeter, 'measure')
     const stop = new Error('stop after first decision')
-    vi.spyOn(compact, 'compactRegion').mockRejectedValueOnce(stop)
+    compact.error = stop
+    const session = conversation(4)
 
-    await expect(compactIfNeeded(compact, conversation(4))).rejects.toBe(stop)
-    expect(measure).toHaveBeenCalledTimes(1)
+    await expect(compactIfNeeded(compact, session)).rejects.toBe(stop)
+    expect(measure.mock.calls[0]).toEqual([session, session.requestHeader()])
+    expect(compact.calls).toHaveLength(1)
   })
 
   it('bounds retries when a shrinking checkpoint remains above threshold', async () => {
@@ -1638,9 +1712,11 @@ describe('default one-shot summarizer', () => {
     await ctx.plugin(TokenMeter)
     const fiber = await ctx.plugin(BasicCompactionEngine, { auto: false })
     expect(ctx.sessionProjections.checkpoint(conversation(1))).toHaveProperty('compactionAnsweredRoute')
+    expect(ctx.sessionProjections.checkpoint(conversation(1))).toHaveProperty('compactionPressureCheckpoint')
 
     await fiber.dispose()
     expect(ctx.sessionProjections.checkpoint(conversation(2))).not.toHaveProperty('compactionAnsweredRoute')
+    expect(ctx.sessionProjections.checkpoint(conversation(2))).not.toHaveProperty('compactionPressureCheckpoint')
   })
 
   it('fails plugin activation when the answered-route projection cannot register', async () => {

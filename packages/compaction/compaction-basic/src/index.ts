@@ -30,6 +30,7 @@ import {
   selectCompactableRange,
 } from './region.ts'
 import { summarizeWithLlm } from './summarizer.ts'
+import { PressureCompactionScheduler, pressureCheckpointProjectionDefinition } from './pressure.ts'
 import type { SummarizationInput, SummaryResult, SummaryRoute } from './summarizer.ts'
 import type {
   BasicCompactionConfig,
@@ -105,6 +106,8 @@ const modelPolicy: z<ModelCompactPolicyConfig> = z.object({
   summarizationModel: summarizationModelSchema,
   maxTokens: maxTokensSchema,
   compactionRetries: compactionRetriesSchema,
+  minReductionRatio: thresholdRatioSchema,
+  failureRetrySteps: compactionRetriesSchema,
   maxOverflowRetries: maxOverflowRetriesSchema,
 })
 
@@ -128,6 +131,8 @@ export class BasicCompactionEngine extends CompactionEngine {
     summarizationModel: summarizationModelSchema,
     maxTokens: maxTokensSchema,
     compactionRetries: compactionRetriesSchema,
+    minReductionRatio: thresholdRatioSchema,
+    failureRetrySteps: compactionRetriesSchema,
     maxOverflowRetries: maxOverflowRetriesSchema,
     modelPolicies: z.array(modelPolicy),
     auto: z.boolean(),
@@ -139,6 +144,8 @@ export class BasicCompactionEngine extends CompactionEngine {
   private readonly warnedPressureConfigTargets = new Set<string>()
   private readonly overflowRetries = new WeakMap<Agent, number>()
   private readonly overflowAgents = new WeakMap<Session, Agent>()
+  private readonly pressureScheduler = new PressureCompactionScheduler()
+  private readonly pressureCheckpoint: Promise<ProjectionHandle<number | null>>
   /** Registered at construction; `summarize()` awaits it, so no read precedes readiness. */
   private readonly answeredRoute: Promise<ProjectionHandle<AnsweredRoute>>
 
@@ -146,12 +153,13 @@ export class BasicCompactionEngine extends CompactionEngine {
     super(ctx)
     this.config = resolveConfig(config)
     this.answeredRoute = this.ctx.sessionProjections.register(answeredRouteProjectionDefinition)
+    this.pressureCheckpoint = this.ctx.sessionProjections.register(pressureCheckpointProjectionDefinition)
     if (this.config.auto) this._registerAutomaticCompaction()
   }
 
-  /** Fail plugin activation when the answered-route projection cannot register. */
+  /** Fail plugin activation when either required projection cannot register. */
   protected async [Service.init](): Promise<void> {
-    await this.answeredRoute
+    await Promise.all([this.answeredRoute, this.pressureCheckpoint])
   }
 
   /**
@@ -301,7 +309,9 @@ export class BasicCompactionEngine extends CompactionEngine {
    * Compact for replayed step-boundary pressure or one provider-confirmed context
    * overflow. Both triggers price the latest durable routed request envelope;
    * overflow bypasses the normal threshold and retained-tail policy so it can
-   * force one useful balanced reduction.
+   * force one useful balanced reduction. Pressure skips checkpoint-only ranges,
+   * defers unchanged non-reducing input, and paces request failures; forced
+   * overflow recovery does not inherit these proactive scheduling decisions.
    * @param agent - agent whose latest durable routed request is measured.
    * @param trigger - normal step-boundary pressure or context-overflow recovery.
    * @param signal - live turn cancellation signal forwarded to summarization.
@@ -368,6 +378,7 @@ export class BasicCompactionEngine extends CompactionEngine {
     if (measurement.totalTokens < spec.thresholdTokens) return null
 
     let result: CompactionResult | null = null
+    const checkpoint = await this.pressureCheckpoint
     for (let attempt = 0; attempt <= spec.compactionRetries; attempt += 1) {
       const range = selectCompactableRange(agent.session, measurement, spec.retainTokens)
       if (range === null) {
@@ -377,7 +388,28 @@ export class BasicCompactionEngine extends CompactionEngine {
           + `(${measurement.totalTokens} estimated tokens >= threshold ${spec.thresholdTokens})`,
         )
       }
-      result = await this.compactRegion(range.start, range.end, agent, signal)
+      if (requireBelowThreshold) {
+        result = await this.compactRegion(range.start, range.end, agent, signal)
+      } else {
+        if (range.start === range.end && range.start === checkpoint.stateOf(agent.session)) return result
+        const startIndex = measurement.nodes.findIndex(node => node.seq === range.start)
+        const endIndex = measurement.nodes.findIndex(node => node.seq === range.end)
+        const input = {
+          header,
+          summaryRoute: conversationTarget(agent, (await this.answeredRoute).stateOf(agent.session)),
+          nodes: measurement.nodes.slice(startIndex, endIndex + 1),
+        }
+        if (!this.pressureScheduler.allows(agent.session, input)) return result
+        try {
+          result = await compactSurfaceRegion(
+            this.regionDependencies(), agent.session, range.start, range.end, agent,
+            { owner: 'current-turn', stability: 'whole-surface', minReductionRatio: spec.minReductionRatio }, signal,
+          )
+        } catch (error: unknown) {
+          if (!signal.aborted) this.pressureScheduler.failed(agent.session, input, error, spec.failureRetrySteps)
+          throw error
+        }
+      }
       measurement = meter.measure(agent.session, header)
       if (measurement.totalTokens < spec.thresholdTokens) return result
     }

@@ -32,6 +32,8 @@ const POLICY_CONFIG_KEYS = [
   'summarizationModel',
   'maxTokens',
   'compactionRetries',
+  'minReductionRatio',
+  'failureRetrySteps',
   'maxOverflowRetries',
 ] as const
 
@@ -103,6 +105,8 @@ export function resolveConfig(config: BasicCompactionConfig = {}): ResolvedConfi
     summarizationModel: config.summarizationModel ?? '',
     maxTokens,
     compactionRetries: config.compactionRetries ?? 1,
+    minReductionRatio: config.minReductionRatio ?? 0.1,
+    failureRetrySteps: config.failureRetrySteps ?? 8,
     maxOverflowRetries: config.maxOverflowRetries ?? 1,
     modelPolicies,
     auto: config.auto ?? true,
@@ -134,6 +138,8 @@ export function resolveTargetPolicy(
     summarizationModel: override?.summarizationModel ?? config.summarizationModel,
     maxTokens: override?.maxTokens ?? config.maxTokens,
     compactionRetries: override?.compactionRetries ?? config.compactionRetries,
+    minReductionRatio: override?.minReductionRatio ?? config.minReductionRatio,
+    failureRetrySteps: override?.failureRetrySteps ?? config.failureRetrySteps,
     maxOverflowRetries: override?.maxOverflowRetries ?? config.maxOverflowRetries,
   })
 }
@@ -212,6 +218,8 @@ export function resolveCompactSpec(
     summarizationModel: policy.summarizationModel,
     maxTokens: policy.maxTokens,
     compactionRetries: policy.compactionRetries,
+    minReductionRatio: policy.minReductionRatio,
+    failureRetrySteps: policy.failureRetrySteps,
     maxOverflowRetries: policy.maxOverflowRetries,
   })
 }
@@ -284,6 +292,8 @@ function validatePolicy(
   const retainTokens = config.retainTokens
   const maxTokens = config.maxTokens
   const compactionRetries = config.compactionRetries
+  const minReductionRatio = config.minReductionRatio
+  const failureRetrySteps = config.failureRetrySteps
   const maxOverflowRetries = config.maxOverflowRetries
   if (thresholdRatio !== undefined) assertRatio(`${name}.thresholdRatio`, thresholdRatio)
   if (headroomTokens !== undefined) assertNonNegativeInteger(`${name}.headroomTokens`, headroomTokens)
@@ -296,6 +306,8 @@ function validatePolicy(
   if (compactionRetries !== undefined) {
     assertNonNegativeInteger(`${name}.compactionRetries`, compactionRetries)
   }
+  if (minReductionRatio !== undefined) assertRatio(`${name}.minReductionRatio`, minReductionRatio)
+  if (failureRetrySteps !== undefined) assertNonNegativeInteger(`${name}.failureRetrySteps`, failureRetrySteps)
   if (maxOverflowRetries !== undefined) {
     assertNonNegativeInteger(`${name}.maxOverflowRetries`, maxOverflowRetries)
   }

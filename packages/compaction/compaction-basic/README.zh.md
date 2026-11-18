@@ -73,6 +73,8 @@ kind: "package-reference"
 | `summarizationModel` | `''` | 与 `summarizationProvider` 一起设置；空对使用产生最新助手消息的模型，再回退到最新已路由请求目标，最后回退到 `AgentOptions` 对。 |
 | `maxTokens` | `headroomTokens`（`65536`） | 正数摘要输出上限，包含提供方计入的推理 token。显式模型上限覆盖显式全局上限；否则跟随解析后的余量。 |
 | `compactionRetries` | `1` | 压力仍高于阈值时，在首次压缩后进行的额外尝试次数。 |
+| `minReductionRatio` | `0.1` | 主动摘要必须移除的选区 token 比例，取值为 `(0, 1]`；强制压缩仅要求摘要更短。 |
+| `failureRetrySteps` | `8` | 摘要请求失败后跳过的后续压力检查次数；`0` 表示下一次检查即可重试。 |
 | `maxOverflowRetries` | `1` | 已确认上下文窗口溢出后的最大重试次数；`0` 只禁用恢复。 |
 | `modelPolicies` | `[]` | 针对个别模型路由的精确 `{ provider, model, ...partialPolicy }` 覆盖。 |
 | `auto` | `true` | 启用自动压缩与溢出恢复；设为 `false` 则仅手动执行。 |
@@ -82,6 +84,8 @@ kind: "package-reference"
 ### 压缩运行时会发生什么
 
 最旧的平衡范围会被替换为一条摘要消息，近期尾部保持逐字不变；对话从摘要继续。操作会报告压缩了多少历史项以及估算释放的 token 数。如果没有任何内容可以安全压缩——例如整个对话就是一个不可分单元——则不会有任何改变，也不会向会话日志写入任何内容。如果没有模型可以撰写摘要（既未配置目标，也还没有已路由请求），压缩会失败并给出清晰错误，提示你配置摘要提供方与模型，或先路由一次请求。
+
+主动压缩会跳过仅含最新检查点的范围。如果摘要移除的 token 比例小于 `minReductionRatio`，则保留原始历史，并在选区内容、定价或请求／摘要路由变化之前暂停对同一输入的重试。其他摘要失败会推迟 `failureRetrySteps` 次压力检查，即使期间增加了历史也会推迟；路由变化则允许立即尝试。这些进程内重试决策在插件重载时重置；检查点识别通过 Session 投影恢复。手动压缩、模型切换准入和已确认溢出后的恢复不受主动压缩抑制和最小缩减比例限制。
 
 ### 切换模型
 
@@ -144,6 +148,7 @@ kind: "package-reference"
 |---|---|
 | [`src/index.ts`](src/index.ts) | 插件入口：`BasicCompactionEngine`、自动 listener、入口点分发 |
 | [`src/answered-route.ts`](src/answered-route.ts) | 仅供宿主使用的投影，保存最新助手消息上记录的提供方／模型 |
+| [`src/pressure.ts`](src/pressure.ts) | 主动压缩重试调度，以及可重放的最新检查点标识 |
 | [`src/region.ts`](src/region.ts) | 保留选择与共享的先记录标记压缩事务 |
 | [`src/summarizer.ts`](src/summarizer.ts) | 默认 `ctx.llm.stream()` 摘要、检查点框定、安全摘要投影 |
 | [`src/config.ts`](src/config.ts) | 加载时验证与路由模型策略解析 |

@@ -73,6 +73,8 @@ All settings are optional. With context window `W`, effective request output cap
 | `summarizationModel` | `''` | Set together with `summarizationProvider`; an empty pair uses the model that produced the latest assistant message, then the latest routed request target, then the `AgentOptions` pair. |
 | `maxTokens` | `headroomTokens` (`65536`) | Positive summary output cap, including any provider-counted reasoning tokens. Explicit per-model caps override explicit global caps; otherwise the cap follows the resolved headroom. |
 | `compactionRetries` | `1` | Extra condensation attempts after the first when pressure remains above threshold. |
+| `minReductionRatio` | `0.1` | Minimum fraction of selected tokens removed by proactive summaries, in `(0, 1]`; forced compaction only requires a smaller summary. |
+| `failureRetrySteps` | `8` | Subsequent pressure checks skipped after an operational summary failure; `0` permits retry on the next check. |
 | `maxOverflowRetries` | `1` | Maximum retries after a confirmed context-window overflow; `0` disables recovery only. |
 | `modelPolicies` | `[]` | Exact `{ provider, model, ...partialPolicy }` overrides for individual model routes. |
 | `auto` | `true` | Enable automatic condensation and overflow recovery; set `false` for manual-only operation. |
@@ -82,6 +84,8 @@ Misconfiguration fails fast: unknown settings, duplicate per-model overrides, in
 ### What happens when condensation runs
 
 The oldest balanced span is replaced by one summary message and the recent tail stays verbatim; the conversation continues from the summary. The operation reports how many history items were condensed and the estimated tokens freed. If nothing can be condensed safely — for example the whole conversation is one indivisible unit — nothing changes and nothing is written to the session log. If no model is available to write the summary (no configured target and no routed request yet), condensation fails with a clear error telling you to configure the summarization provider and model or route one request.
+
+Proactive condensation skips a range containing only the latest checkpoint. A summary that saves less than `minReductionRatio` keeps the original history and defers the same selected input until its content, pricing, or request/summary route changes. Other summary failures defer `failureRetrySteps` pressure checks, including checks with new history, while a changed route permits a new attempt. These process-local retry decisions reset when the plugin reloads; checkpoint recognition restores through a Session projection. Manual condensation, model-switch admission, and confirmed overflow recovery bypass proactive suppression and the minimum reduction ratio.
 
 ### Switching models
 
@@ -144,6 +148,7 @@ The transaction validates the surface span and the durable lock, appends `compac
 |---|---|
 | [`src/index.ts`](src/index.ts) | Plugin entry: `BasicCompactionEngine`, automatic listeners, entry-point dispatch |
 | [`src/answered-route.ts`](src/answered-route.ts) | Host-only projection of the provider/model recorded on the latest assistant message |
+| [`src/pressure.ts`](src/pressure.ts) | Proactive retry scheduling and replayable latest-checkpoint identity |
 | [`src/region.ts`](src/region.ts) | Retention selection and the shared bracket-first compaction transaction |
 | [`src/summarizer.ts`](src/summarizer.ts) | Default `ctx.llm.stream()` summarization, checkpoint framing, safe-summary projection |
 | [`src/config.ts`](src/config.ts) | Load-time validation and routed-model policy resolution |

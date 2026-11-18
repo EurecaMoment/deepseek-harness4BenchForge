@@ -54,6 +54,8 @@ type SummarizedCompaction = PreparedCompaction & SummaryResult & {
 }
 
 interface CompactionTransactionOptions {
+  /** Proactive pressure's minimum fractional reduction; absent for forced compaction, which only requires shrinkage. */
+  readonly minReductionRatio?: number
   /** `current-turn` derives a numbered owner; `null` writes a standalone bracket. */
   readonly owner: 'current-turn' | null
   /** Surface relationship that must survive asynchronous summarization. */
@@ -76,6 +78,9 @@ interface CompactionEntryState {
  * caller can report the two causes differently.
  */
 class SurfaceChangedError extends Error {}
+
+/** A completed summary cannot replace its input with the required token reduction. */
+export class CompactionReductionError extends Error {}
 
 /** Whether the summary may still replace the span it was built from. */
 type StabilityCheck = (
@@ -228,6 +233,7 @@ export async function compactSurfaceRegion(
       compactionId,
       options.sourceCommandId,
       assertStable,
+      options.minReductionRatio,
       signal,
     )
     if (options.owner === null) signal?.throwIfAborted()
@@ -392,6 +398,7 @@ async function summarizeCompaction(
   compactionId: CompactionResult['compactionId'],
   sourceCommandId: CommandId | undefined,
   assertStable: StabilityCheck,
+  minReductionRatio: number | undefined,
   signal?: AbortSignal,
 ): Promise<SummarizedCompaction> {
   let summaryResult: SummaryResult
@@ -417,8 +424,17 @@ async function summarizeCompaction(
   // question — does the replacement lower the next request's pressure.
   const framedSummaryTokenCount = dependencies.meter.estimateMessage(checkpointMessage)
   if (framedSummaryTokenCount >= prepared.shadowedRouteTokenCount) {
-    throw new Error(
+    throw new CompactionReductionError(
       `summary is not smaller than the shadowed content (${framedSummaryTokenCount} estimated framed tokens >= ${prepared.shadowedRouteTokenCount})`,
+    )
+  }
+  if (minReductionRatio !== undefined
+    && prepared.shadowedRouteTokenCount - framedSummaryTokenCount
+      < Math.ceil(prepared.shadowedRouteTokenCount * minReductionRatio)) {
+    throw new CompactionReductionError(
+      `summary does not meet the minimum pressure reduction of ${minReductionRatio * 100}% `
+      + `(${prepared.shadowedRouteTokenCount} to ${framedSummaryTokenCount} estimated tokens); `
+      + 'keeping the original history until the compactable input changes',
     )
   }
   return {

@@ -780,7 +780,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-compaction-basic`
 
 - `inject`: `llm` · `tokenMeter` · `sessions` · `sessionProjections`
-- `source`: [`packages/compaction/compaction-basic/src/types.ts:46`](../packages/compaction/compaction-basic/src/types.ts)
+- `source`: [`packages/compaction/compaction-basic/src/types.ts:50`](../packages/compaction/compaction-basic/src/types.ts)
 
 ```ts config-catalog
 /** Basic compaction configuration with an optional exact-target policy table. */
@@ -809,6 +809,10 @@ export interface CompactionPolicyConfig {
   maxTokens?: number
   /** Extra attempts after the first compaction when pressure remains above threshold. Defaults to `1`. */
   compactionRetries?: number
+  /** Minimum fraction removed by proactive pressure summaries. Defaults to `0.1`; forced compaction only requires shrinkage. */
+  minReductionRatio?: number
+  /** Pressure checks skipped after a summarizer failure. Defaults to `8`; unchanged non-shrinking inputs wait for new history. */
+  failureRetrySteps?: number
   /** Maximum retries after canonical context overflow; `0` disables recovery. Defaults to `1`. */
   maxOverflowRetries?: number
 }

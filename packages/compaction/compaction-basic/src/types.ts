@@ -30,6 +30,10 @@ export interface CompactionPolicyConfig {
   maxTokens?: number
   /** Extra attempts after the first compaction when pressure remains above threshold. Defaults to `1`. */
   compactionRetries?: number
+  /** Minimum fraction removed by proactive pressure summaries. Defaults to `0.1`; forced compaction only requires shrinkage. */
+  minReductionRatio?: number
+  /** Pressure checks skipped after a summarizer failure. Defaults to `8`; unchanged non-shrinking inputs wait for new history. */
+  failureRetrySteps?: number
   /** Maximum retries after canonical context overflow; `0` disables recovery. Defaults to `1`. */
   maxOverflowRetries?: number
 }
@@ -63,6 +67,8 @@ interface ResolvedPolicyFields {
   readonly summarizationModel: string
   readonly maxTokens: number
   readonly compactionRetries: number
+  readonly minReductionRatio: number
+  readonly failureRetrySteps: number
   readonly maxOverflowRetries: number
 }
 

@@ -6,8 +6,11 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
-import LlmRuntime from '@deepseek-ai/dsh-llm'
-import SessionStore from '@deepseek-ai/dsh-session'
+import LlmRuntime, { LlmAdapter, createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { LlmResolvedModelInfo, StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { Agent } from '@deepseek-ai/dsh-agent'
+import { brandString } from '@deepseek-ai/dsh-brand'
+import SessionStore, { Session, type SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import BasicCompactionEngine from '@deepseek-ai/dsh-compaction-basic'
@@ -56,6 +59,57 @@ async function loadYaml(lines: readonly string[]): Promise<Context> {
 }
 
 describe('real Loader composition', () => {
+  it('continues repeated pressure checks without repeating a non-shrinking model request', async () => {
+    const loaded = await loadYaml([
+      "- name: '@deepseek-ai/dsh-llm'",
+      "- name: '@deepseek-ai/dsh-session'",
+      "- name: '@deepseek-ai/dsh-session-projection'",
+      "- name: '@deepseek-ai/dsh-token-meter'",
+      "- name: '@deepseek-ai/dsh-compaction-basic'",
+      '  config:',
+      '    thresholdRatio: 0.2',
+      '    headroomTokens: 0',
+      '    retainTokens: 100',
+      '    maxTokens: 1024',
+      '    minReductionRatio: 0.1',
+      '    failureRetrySteps: 2',
+      '    auto: false',
+    ])
+    let summaryCalls = 0
+    class NonShrinkingAdapter extends LlmAdapter {
+      override resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
+        return Promise.resolve({ provider, id: model, name: model, context: { contextWindow: 1000 } })
+      }
+
+      override async * stream(): AsyncIterable<StreamChunk> {
+        summaryCalls += 1
+        yield { type: 'block-start', index: 0, blockType: 'text' }
+        yield { type: 'block-end', index: 0, block: { type: 'text', text: 'unchanged '.repeat(1000) } }
+        yield { type: 'finish', reason: { kind: 'stop' } }
+      }
+    }
+    loaded.llm.registerAdapter(['mock'], new NonShrinkingAdapter())
+    const session = Session.create(brandString<SessionId>('loader-pressure-convergence'))
+    session.append('turn/start', { turn: 1 })
+    session.append('request/header', { header: { config: { provider: 'mock', model: 'small' } }, reason: 'initial' })
+    for (let message = 0; message < 4; message += 1) {
+      session.append('user/message', createUserMessage({
+        content: [{ type: 'text', text: `history ${message} `.repeat(80) }], source: { kind: 'user' },
+      }), { surfaceOp: 'append' })
+    }
+    const agent = { session, options: { provider: 'mock', model: 'small' } } as Agent
+    const signal = new AbortController().signal
+    await expect(loaded.compaction.compactIfNeeded(agent, 'pressure', signal)).rejects.toThrow(/not smaller/)
+    for (let check = 0; check < 12; check += 1) {
+      await expect(loaded.compaction.compactIfNeeded(agent, 'pressure', signal)).resolves.toBeNull()
+    }
+    expect(summaryCalls).toBe(1)
+    expect(session.snapshotEvents().filter(event => event.type.startsWith('compaction/'))
+      .map(event => event.type)).toEqual(['compaction/start', 'compaction/end'])
+    await expect(loaded.compaction.compactIfNeeded(agent, 'context-overflow', signal)).rejects.toThrow(/not smaller/)
+    expect(summaryCalls).toBe(2)
+  })
+
   it('loads the shipped token-meter, pruning, and compaction-basic YAML order', async () => {
     const loaded = await loadYaml([
       "- name: '@deepseek-ai/dsh-llm'",
