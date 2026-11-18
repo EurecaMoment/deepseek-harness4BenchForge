@@ -16,6 +16,7 @@ interface DocumentsDirectoryInternals {
  * Validate a configured or OS-returned Documents path without resolving it against cwd.
  * @param directory - fully qualified directory spelling.
  * @param platform - Host platform.
+ * @param label - Subject used in path validation diagnostics.
  * @returns the normalized directory.
  */
 export function validateDocumentsDirectory(directory: string, platform: NodeJS.Platform = process.platform, label = 'Documents directory'): string {
